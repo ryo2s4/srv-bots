@@ -709,6 +709,33 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+// ── RGB watchdog ───────────────────────────────────────────────────────────
+// Independent from the scheduler inside clientReady: if that interval ever
+// goes quiet, this timer notices the stale lastOkAt and forces a fresh tick.
+let rgbTickCount = 0;
+setInterval(() => {
+    try {
+        if (!client.isReady()) return;
+        const now = Date.now();
+        for (const [gid, cfg] of Object.entries(getAllGuildConfigs())) {
+            const r = cfg && cfg.rgbRole;
+            if (!r || !r.roleId || !r.intervalMs) continue;
+            const iv = Math.max(2000, Number(r.intervalMs) || 0);
+            const last = Number(r.lastOkAt) || 0;
+            // Longer than the 5-minute failure backoff, so we don't fight it.
+            if (last && (now - last) > Math.max(6 * 60_000, iv * 3)) {
+                updateGuildConfig(gid, (c) => ({
+                    ...c,
+                    rgbRole: { ...(c.rgbRole && typeof c.rgbRole === 'object' ? c.rgbRole : {}), nextAt: now }
+                }));
+                console.log(`rgbRole watchdog: forcing tick for ${gid} (last ok ${Math.round((now - last) / 1000)}s ago)`);
+            }
+        }
+    } catch (err) {
+        console.error('rgbRole watchdog error:', err && err.message ? err.message : err);
+    }
+}, 30_000);
+
 // Auto-leave: when Luna is alone in a voice channel, leave + stop after a grace period
 const aloneLeaveTimers = new Map(); // guildId -> timeout
 
@@ -1468,6 +1495,8 @@ client.once('clientReady', async () => {
         rgbRoleSchedulerStarted = true;
         setInterval(async () => {
             const now = Date.now();
+            rgbTickCount += 1;
+            if (rgbTickCount % 30 === 0) console.log(`rgbRole alive: ${rgbTickCount} ticks`);
             for (const [, guild] of client.guilds.cache) {
                 try {
                     const lk = rgbRoleTickLocks.get(guild.id) || 0;
