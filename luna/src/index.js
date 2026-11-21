@@ -1444,6 +1444,26 @@ client.once('clientReady', async () => {
         }
     }, 30 * 1000);
 
+    // RGB role: an enabled config must resume right after a restart, even if
+    // its saved nextAt was left far in the future by an old failed tick.
+    try {
+        const bootNow = Date.now();
+        for (const [gid, cfg] of Object.entries(getAllGuildConfigs())) {
+            const rr = cfg && cfg.rgbRole;
+            if (!rr || !rr.roleId || !rr.intervalMs) continue;
+            const iv = Math.max(2000, Number(rr.intervalMs) || 0);
+            const next = Number(rr.nextAt) || 0;
+            if (!next || next > bootNow + iv * 2) {
+                updateGuildConfig(gid, (c) => ({
+                    ...c,
+                    rgbRole: { ...(c.rgbRole && typeof c.rgbRole === 'object' ? c.rgbRole : {}), nextAt: bootNow, failCount: 0 }
+                }));
+            }
+        }
+    } catch (err) {
+        console.error('rgbRole startup repair failed:', err && err.message ? err.message : err);
+    }
+
     if (!rgbRoleSchedulerStarted) {
         rgbRoleSchedulerStarted = true;
         setInterval(async () => {
@@ -1462,30 +1482,52 @@ client.once('clientReady', async () => {
 
                     const intervalMs = Math.max(2000, Math.floor(Number(r.intervalMs) || 0));
                     const nextAt = Number(r.nextAt) || 0;
-                    if (nextAt && now < nextAt) continue;
+                    const lastOkAt = Number(r.lastOkAt) || 0;
+                    // Watchdog: if we haven't recoloured for too long, ignore a
+                    // stuck nextAt and tick now. This is what keeps RGB alive
+                    // after a restart or a temporary Discord hiccup.
+                    const stale = lastOkAt > 0 && (now - lastOkAt) > Math.max(30_000, intervalMs * 3);
+                    if (nextAt && now < nextAt && !stale) continue;
 
                     const roleId = String(r.roleId);
                     const role = guild.roles.cache.get(roleId) || (await guild.roles.fetch(roleId).catch(() => null));
                     if (!role) {
                         const nextFail = failCount + 1;
+                        // Never disable the feature on transient failures.
+                        // Back off, remember the failure count, and keep retrying.
+                        const backoff = Math.min(5 * 60_000, Math.max(intervalMs, 2000) * Math.max(1, nextFail));
                         updateGuildConfig(guild.id, (c) => ({
                             ...c,
-                            rgbRole: nextFail >= 10
-                                ? { roleId: null, intervalMs: 0, nextAt: 0, hue: 0, failCount: 0 }
-                                : {
-                                    ...(c.rgbRole && typeof c.rgbRole === 'object' ? c.rgbRole : {}),
-                                    roleId,
-                                    intervalMs,
-                                    nextAt: now + Math.max(intervalMs, 30_000),
-                                    failCount: nextFail
-                                }
+                            rgbRole: {
+                                ...(c.rgbRole && typeof c.rgbRole === 'object' ? c.rgbRole : {}),
+                                roleId,
+                                intervalMs,
+                                nextAt: now + backoff,
+                                failCount: nextFail
+                            }
                         }));
+                        console.warn(`rgbRole ${guild.id}: ${role ? 'edit failed' : 'role missing'} (${nextFail}) — retry in ${Math.round(backoff / 1000)}s`);
                         continue;
                     }
 
                     const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
-                    if (!me || !me.permissions.has(PermissionsBitField.Flags.ManageRoles)) continue;
-                    if (me.roles.highest.comparePositionTo(role) <= 0) continue;
+                    const canEdit = me
+                        && me.permissions.has(PermissionsBitField.Flags.ManageRoles)
+                        && me.roles.highest.comparePositionTo(role) > 0;
+                    if (!canEdit) {
+                        // Permissions or hierarchy are wrong. Back off instead of
+                        // spinning every two seconds, but never switch RGB off.
+                        updateGuildConfig(guild.id, (c) => ({
+                            ...c,
+                            rgbRole: {
+                                ...(c.rgbRole && typeof c.rgbRole === 'object' ? c.rgbRole : {}),
+                                roleId,
+                                intervalMs,
+                                nextAt: now + Math.max(intervalMs, 30_000)
+                            }
+                        }));
+                        continue;
+                    }
 
                     const hue = typeof r.hue === 'number' ? r.hue : 0;
                     const color = hslToRgbInt(hue, 1, 0.5);
@@ -1494,18 +1536,20 @@ client.once('clientReady', async () => {
                         await role.edit({ colors: { primaryColor: color } });
                     } catch {
                         const nextFail = failCount + 1;
+                        // Never disable the feature on transient failures.
+                        // Back off, remember the failure count, and keep retrying.
+                        const backoff = Math.min(5 * 60_000, Math.max(intervalMs, 2000) * Math.max(1, nextFail));
                         updateGuildConfig(guild.id, (c) => ({
                             ...c,
-                            rgbRole: nextFail >= 10
-                                ? { roleId: null, intervalMs: 0, nextAt: 0, hue: 0, failCount: 0 }
-                                : {
-                                    ...(c.rgbRole && typeof c.rgbRole === 'object' ? c.rgbRole : {}),
-                                    roleId,
-                                    intervalMs,
-                                    nextAt: now + Math.max(intervalMs, 30_000),
-                                    failCount: nextFail
-                                }
+                            rgbRole: {
+                                ...(c.rgbRole && typeof c.rgbRole === 'object' ? c.rgbRole : {}),
+                                roleId,
+                                intervalMs,
+                                nextAt: now + backoff,
+                                failCount: nextFail
+                            }
                         }));
+                        console.warn(`rgbRole ${guild.id}: ${role ? 'edit failed' : 'role missing'} (${nextFail}) — retry in ${Math.round(backoff / 1000)}s`);
                         continue;
                     }
 
@@ -1517,7 +1561,8 @@ client.once('clientReady', async () => {
                             intervalMs,
                             nextAt: now + intervalMs,
                             hue: (hue + 15) % 360,
-                            failCount: 0
+                            failCount: 0,
+                            lastOkAt: now
                         }
                     }));
                 } catch (err) {
