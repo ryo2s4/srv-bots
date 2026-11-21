@@ -1,0 +1,11 @@
+node_modules/
+data/
+audio/
+.env
+.env.*
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+storage.json
+*.log
+.DS_Store
