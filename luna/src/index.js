@@ -8,6 +8,46 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
+// ── Presence persistence ───────────────────────────────────────────────────
+// The owner panel's "تغيير الحالة" is stored under data/ (runtime state, never
+// in git) and restored on every boot so a restart no longer resets it.
+const PRESENCE_FILE = path.join(__dirname, '..', 'data', 'presence.json');
+const DEFAULT_PRESENCE = { status: 'online', type: 'PLAYING', text: 'مع الأوامر!' };
+
+function loadPresence() {
+    try {
+        const p = JSON.parse(fs.readFileSync(PRESENCE_FILE, 'utf8'));
+        if (p && typeof p.status === 'string' && typeof p.type === 'string' && typeof p.text === 'string') {
+            return { status: p.status, type: p.type, text: p.text };
+        }
+    } catch {
+        // first run or corrupt file — fall back to the default
+    }
+    return { ...DEFAULT_PRESENCE };
+}
+
+function savePresence(p) {
+    try {
+        fs.mkdirSync(path.dirname(PRESENCE_FILE), { recursive: true });
+        const tmp = `${PRESENCE_FILE}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(p, null, 2));
+        fs.renameSync(tmp, PRESENCE_FILE);
+    } catch (err) {
+        console.error('presence save failed:', err && err.message ? err.message : err);
+    }
+}
+
+function activityType(name) {
+    const map = {
+        PLAYING: ActivityType.Playing,
+        WATCHING: ActivityType.Watching,
+        LISTENING: ActivityType.Listening,
+        COMPETING: ActivityType.Competing,
+        STREAMING: ActivityType.Streaming
+    };
+    return map[String(name || '').toUpperCase()] || ActivityType.Playing;
+}
+
 let lootboxSchedulerStarted = false;
 let rgbRoleSchedulerStarted = false;
 let eventsSchedulerStarted = false;
@@ -1206,7 +1246,18 @@ async function finalizeAuction(guildId) {
 // When the client is ready
 client.once('clientReady', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
-    client.user.setActivity('مع الأوامر!', { type: ActivityType.Playing });
+    // Restore the owner-configured presence instead of the hardcoded default.
+    try {
+        const saved = loadPresence();
+        client.user.setPresence({
+            status: saved.status,
+            activities: [{ name: saved.text, type: activityType(saved.type) }]
+        });
+        console.log(`Presence restored: ${saved.status} / ${saved.type} ${saved.text}`);
+    } catch (err) {
+        console.error('presence restore failed:', err && err.message ? err.message : err);
+        client.user.setActivity(DEFAULT_PRESENCE.text, { type: ActivityType.Playing });
+    }
 
     // Register slash commands automatically
     try {
@@ -2992,13 +3043,17 @@ client.on('interactionCreate', async interaction => {
 
             const status = statusMap[statusRaw] || 'online';
             const type = typeMap[typeRaw] || ActivityType.Playing;
+            const typeName = Object.prototype.hasOwnProperty.call(typeMap, typeRaw) ? typeRaw : 'PLAYING';
+            const activityText = text || 'مع الأوامر!';
 
             try {
                 client.user.setPresence({
                     status,
-                    activities: [{ name: text || 'مع الأوامر!', type }]
+                    activities: [{ name: activityText, type }]
                 });
-                return interaction.reply({ content: `✅ تم تحديث الحالة: **${status}** — **${typeRaw} ${text}**`, flags: MessageFlags.Ephemeral });
+                // Persist so the next restart restores exactly this presence.
+                savePresence({ status, type: typeName, text: activityText });
+                return interaction.reply({ content: `✅ تم تحديث الحالة وحفظها: **${status}** — **${typeName} ${activityText}**`, flags: MessageFlags.Ephemeral });
             } catch (err) {
                 return interaction.reply({ content: `صار خطأ وأنا أحدث الحالة: \`${String(err).slice(0, 500)}\``, flags: MessageFlags.Ephemeral });
             }
