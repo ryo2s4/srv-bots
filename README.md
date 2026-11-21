@@ -21,3 +21,4 @@ Manual equivalent on the server:
 git -C ~/src/srv-bots pull --ff-only
 systemctl --user restart discord-bot@luna discord-bot@religion
 ```
+- Deploy pipeline verified 15:11:26
