@@ -136,7 +136,7 @@ async function finish(state, winnerId) {
         const ch = state.channel;
         if (ch && typeof ch.messages?.fetch === 'function') {
             const msg = await ch.messages.fetch(state.messageId).catch(() => null);
-            if (msg) await msg.edit({ embeds: [embed], components: [] }).catch(() => null);
+            if (msg) await msg.edit({ content: null, embeds: [embed], components: [] }).catch(() => null);
             else await ch.send({ embeds: [embed] }).catch(() => null);
         }
     } catch { /* ignore */ }
@@ -180,7 +180,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
             id, guildId: String(guildId), type: 'trivia', channel,
             roundIndex, roundTotal, done, _resolveDone: resolveDone,
             messageId: null, prize: Number(c.prizePoints) || 100, gift,
-            description: `${c.roleId ? `<@&${c.roleId}> ` : ''}${t.q}\n\nأول إجابة صحيحة تفوز!`,
+            description: `${t.q}\n\nأول إجابة صحيحة تفوز!`,
             correct, entrants: new Set(), finished: false, endsAt: Date.now() + 90_000
         };
         const row = new ActionRowBuilder().addComponents(
@@ -190,20 +190,30 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
                 .setStyle(i === 0 ? ButtonStyle.Primary : ButtonStyle.Success))
         );
         state.options = options;
-        const msg = await channel.send({ embeds: [buildEventEmbed(state)], components: [row], allowedMentions }).catch(() => null);
+        const msg = await channel.send({
+            content: c.roleId ? `<@&${String(c.roleId)}>` : undefined,
+            embeds: [buildEventEmbed(state)],
+            components: [row],
+            allowedMentions
+        }).catch(() => null);
         state.messageId = msg && msg.id;
     } else {
         state = {
             id, guildId: String(guildId), type: 'giveaway', channel,
             roundIndex, roundTotal, done, _resolveDone: resolveDone,
             messageId: null, prize: Number(c.prizePoints) || 100, gift,
-            description: `${c.roleId ? `<@&${c.roleId}> ` : ''}جيف أواي جديد! اضغط المشاركة قبل انتهاء الوقت.`,
+            description: 'جيف أواي جديد! اضغط المشاركة قبل انتهاء الوقت.',
             entrants: new Set(), finished: false, endsAt: Date.now() + Math.max(1, Number(c.giveawayMinutes) || 5) * 60_000
         };
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`fun:giveaway:${id}:join`).setLabel('🎁 مشاركة').setStyle(ButtonStyle.Success)
         );
-        const msg = await channel.send({ embeds: [buildEventEmbed(state)], components: [row], allowedMentions }).catch(() => null);
+        const msg = await channel.send({
+            content: c.roleId ? `<@&${String(c.roleId)}>` : undefined,
+            embeds: [buildEventEmbed(state)],
+            components: [row],
+            allowedMentions
+        }).catch(() => null);
         state.messageId = msg && msg.id;
     }
 
