@@ -1300,7 +1300,10 @@ client.once('clientReady', async () => {
             // with 50001 Missing Access and left users with no commands.
             // Guild-scoped only. Registering the same command globally as well
             // makes it show up twice in Discord's / picker.
-            console.log('Registering slash commands (guilds)...');
+            // Global commands are visible in every guild the bot joins. Clear
+            // old guild-scoped copies so commands don't appear twice.
+            console.log('Registering slash commands (global)...');
+            await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commandsData });
             let guilds = [];
             try {
                 guilds = await rest.get(Routes.userGuilds());
@@ -1309,12 +1312,12 @@ client.once('clientReady', async () => {
             }
             for (const g of guilds) {
                 try {
-                    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, String(g.id)), { body: commandsData });
+                    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, String(g.id)), { body: [] });
                 } catch (err) {
-                    console.error(`Failed guild command registration for ${g.name} (${g.id}):`, err.message);
+                    console.error(`Failed clearing guild commands for ${g.name} (${g.id}):`, err.message);
                 }
             }
-            console.log(`Successfully registered slash commands (${guilds.length} guilds).`);
+            console.log(`Successfully registered global slash commands (cleared ${guilds.length} guilds).`);
         }
     } catch (error) {
         console.error('Failed to register slash commands:', error.message);
@@ -2643,8 +2646,7 @@ client.on('interactionCreate', async interaction => {
 
             return interaction.update({
                 content: `📣 السيرفر: **${guild.name}**\nاختر الروم`,
-                components: [row],
-                flags: MessageFlags.Ephemeral
+                components: [row]
             });
         }
 

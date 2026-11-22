@@ -347,13 +347,27 @@ async function resumeGuildPlayback(interaction) {
     try {
         if (!interaction || !interaction.guild) return { ok: false, error: 'ما فيه سيرفر' };
         const session = getOrCreateVoiceSession(interaction.guild.id);
-        const source = trackSource(session && session.currentTrack);
-        if (!session || !session.paused || !source) {
-            return { ok: false, error: 'ما فيه شي موقوف مؤقتاً' };
+        const state = session.player && session.player.state ? session.player.state.status : 'idle';
+
+        // If the player went idle (natural end / reconnect) the "current"
+        // track may be gone — fall back to the last one we actually played.
+        let track = session.currentTrack;
+        let source = trackSource(track);
+        if (!source || (!session.paused && state === 'idle')) {
+            track = session.lastTrack;
+            source = trackSource(track);
         }
-        await startPlaybackFromFile(interaction, source, session.currentTrack.displayName || source);
+        if (!source) return { ok: false, error: 'ما فيه شي موقوف مؤقتاً' };
+
+        session.paused = false;
+        session.__suppressNextIdle = false;
+        await startPlaybackFromFile(interaction, source, (track && track.displayName) || source, {
+            durationMs: session.trackDurationMs,
+            discBuffer: track && track.discBuffer
+        });
         return { ok: true };
-    } catch {
+    } catch (err) {
+        logError('Music resume failed', err, { guildId: interaction && interaction.guild ? interaction.guild.id : null });
         return { ok: false, error: 'ما قدرت أكمل التشغيل' };
     }
 }
@@ -533,8 +547,9 @@ function getPlayBrowseCache(guildId, userId, catKey) {
 async function startPlaybackFromFile(interaction, filePath, displayName, meta = {}) {
     if (!interaction.guild) return;
 
+    const earlySession = getOrCreateVoiceSession(interaction.guild.id);
     const voice = interaction.member && interaction.member.voice ? interaction.member.voice : null;
-    const channel = voice && voice.channel ? voice.channel : null;
+    const channel = (voice && voice.channel) || earlySession.voiceChannelRef || null;
     if (!channel) {
         try {
             if (interaction.deferred || interaction.replied) {
@@ -610,7 +625,7 @@ async function startPlaybackFromFile(interaction, filePath, displayName, meta = 
         }
     }
 
-    const session = getOrCreateVoiceSession(interaction.guild.id);
+    const session = earlySession;
     try {
         session.voiceChannelId = channel.id;
         session.guildRef = interaction.guild;
@@ -888,7 +903,7 @@ async function startPlaybackFromFile(interaction, filePath, displayName, meta = 
         session.player.play(resource);
 
         try {
-            await entersState(session.player, AudioPlayerStatus.Playing, 5000).catch(() => null);
+            await entersState(session.player, AudioPlayerStatus.Playing, 1500).catch(() => null);
         } catch { /* ignore */ }
 
         const idleHandler = async (oldState, newState) => {

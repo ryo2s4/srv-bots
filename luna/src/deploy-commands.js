@@ -44,14 +44,15 @@ const rest = new REST({ version: '10', timeout: 30_000 }).setToken(token);
     try {
         console.log('Started refreshing application (/) commands.');
 
-        // Guild-scoped only: a global copy of the same command makes it appear
-        // twice in Discord's / picker. Never trust a hardcoded GUILD_ID from
-        // .env — a stale guild id makes registration fail with 50001.
+        // Global commands, then remove stale guild-scoped copies so the
+        // picker never shows the same command twice.
+        await rest.put(Routes.applicationCommands(clientId), { body: commands });
+        console.log('Global commands reloaded.');
         const guilds = await rest.get(Routes.userGuilds());
         for (const g of guilds) {
             try {
-                await rest.put(Routes.applicationGuildCommands(clientId, String(g.id)), { body: commands });
-                console.log(`Guild commands reloaded: ${g.name} (${g.id})`);
+                await rest.put(Routes.applicationGuildCommands(clientId, String(g.id)), { body: [] });
+                console.log(`Cleared guild commands: ${g.name} (${g.id})`);
             } catch (err) {
                 console.error(`Guild ${g.name} (${g.id}) failed:`, err.rawError?.message || err.message);
             }
