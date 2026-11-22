@@ -1,7 +1,11 @@
 // V11.6 — daily random fun events, competitive trivia and giveaways.
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const { getGuildConfig, updateGuildConfig } = require('./guildConfig');
-const { addLunaPoints } = require('./levelsStore');
+const { addLunaPoints, updateUserStats } = require('./levelsStore');
+const { getUserInventory, updateUserInventory } = require('./shopStore');
+const { getGuildShop, updateGuildShop } = require('./shopStore');
+const { processXpGain } = require('./levelUpService');
+const { generateRuneDrop } = require('./runes');
 
 const active = new Map(); // eventId -> state
 const roundLocks = new Set(); // guild ids with a round in progress
@@ -14,16 +18,75 @@ const TRIVIA = [
     { q: 'ما أسرع حيوان على اليابسة؟', a: ['الفهد'], wrong: ['الأسد', 'الغزال'] }
 ];
 
+const GIFT_TYPES = {
+    xp_potion:       { name: '⚡ بوست خبرة +25% (ساعة)', rarity: 'uncommon' },
+    points_potion:   { name: '💰 بوست نقاط لونا +25% (ساعة)', rarity: 'uncommon' },
+    levelup_potion:  { name: '🏅 بوست مكافأة ترفيع +50% (ساعة)', rarity: 'rare' },
+    points:          { name: '🌙 نقاط لونا', rarity: 'common' },
+    coupon:          { name: '🎟️ كوبون خصم 15% بالمتجر', rarity: 'rare' },
+    generous_xp:     { name: '✨ خبرة سخية', rarity: 'rare' },
+    rune:            { name: '🔮 رونة عشوائية', rarity: 'epic' }
+};
+const RARITY_WEIGHT = { common: 60, uncommon: 30, rare: 10, epic: 4, legendary: 1 };
+
 function pickWeighted(gifts) {
-    const list = (Array.isArray(gifts) ? gifts : []).filter((g) => g && typeof g === 'object' && g.name);
-    if (!list.length) return null;
-    const weight = { common: 60, uncommon: 30, rare: 10, epic: 4, legendary: 1 };
+    const list = (Array.isArray(gifts) ? gifts : []).map((k) => (typeof k === 'string' ? k : (k && (k.key || k.name))));
+    const keys = list.filter((k) => GIFT_TYPES[k]);
+    if (!keys.length) return null;
     const pool = [];
-    for (const g of list) {
-        const w = weight[String(g.rarity || 'common').toLowerCase()] || 10;
-        for (let i = 0; i < w; i++) pool.push(g);
+    for (const key of keys) {
+        const w = RARITY_WEIGHT[GIFT_TYPES[key].rarity] || 10;
+        for (let i = 0; i < w; i++) pool.push(key);
     }
     return pool[Math.floor(Math.random() * pool.length)] || null;
+}
+
+// Actually grant the chosen gift. Returns a short human-readable line.
+async function applyGift(guildId, userId, key, prize) {
+    const info = GIFT_TYPES[key];
+    if (!info) return '';
+    const now = Date.now();
+    if (key === 'xp_potion' || key === 'points_potion' || key === 'levelup_potion') {
+        const type = key === 'xp_potion' ? 'xp_boost_25_1h'
+            : key === 'points_potion' ? 'luna_boost_25_1h' : 'levelup_reward_boost_50_1h';
+        updateUserInventory(guildId, userId, (inv) => {
+            const next = { ...inv };
+            next.activeBoosts = Array.isArray(next.activeBoosts) ? [...next.activeBoosts] : [];
+            next.activeBoosts.push({ type, acquiredAt: now, expiresAt: now + 60 * 60 * 1000 });
+            return next;
+        });
+        return info.name;
+    }
+    if (key === 'points') {
+        addLunaPoints(guildId, userId, Number(prize) || 100);
+        return `${info.name} (${Number(prize) || 100})`;
+    }
+    if (key === 'coupon') {
+        const code = `FUN${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+        updateGuildShop(guildId, (s) => {
+            const next = { ...s };
+            next.coupons = next.coupons && typeof next.coupons === 'object' ? { ...next.coupons } : {};
+            next.coupons[code] = { percent: 15, maxUses: 1, used: 0, createdAt: now, expiresAt: now + 7 * 86400000 };
+            return next;
+        });
+        return `🎟️ كود **${code}** — خصم 15% لمرة واحدة`;
+    }
+    if (key === 'generous_xp') {
+        const amount = Math.max(100, Number(prize) || 100) * 5;
+        try { processXpGain(guildId, userId, amount); } catch { /* ignore */ }
+        return `${info.name} (+${amount} XP)`;
+    }
+    if (key === 'rune') {
+        const runes = generateRuneDrop(1);
+        updateUserInventory(guildId, userId, (inv) => {
+            const next = { ...inv };
+            next.runes = Array.isArray(next.runes) ? [...next.runes] : [];
+            next.runes.push(...runes);
+            return next;
+        });
+        return `${info.name} ×${runes.length}`;
+    }
+    return '';
 }
 
 function buildEventEmbed(state) {
@@ -37,14 +100,18 @@ function buildEventEmbed(state) {
                 : (state.type === 'giveaway' ? 'اضغط مشاركة' : 'أول إجابة صحيحة تفوز')
         })
         .setTimestamp();
-    if (state.gift) e.addFields({ name: '🎁 الهدية', value: `${state.gift.name} (${state.gift.rarity || 'common'})`, inline: false });
+    if (state.gift && GIFT_TYPES[state.gift]) {
+        const gi = GIFT_TYPES[state.gift];
+        e.addFields({ name: '🎁 الهدية', value: `${gi.name} (${gi.rarity})`, inline: false });
+    }
     if (state.type === 'giveaway') e.addFields({ name: '👥 المشاركون', value: String(state.entrants.size), inline: true });
     return e;
 }
 
 async function award(guildId, userId, state) {
-    try { addLunaPoints(guildId, userId, Number(state.prize) || 0); } catch { /* ignore */ }
-    return state.gift ? `${state.gift.name} + ${state.prize} LP` : `${state.prize} Luna Points`;
+    const giftLine = state.gift ? await applyGift(guildId, userId, state.gift, state.prize) : '';
+    const pointsLine = state.gift === 'points' ? '' : `${Number(state.prize) || 0} Luna Points`;
+    return [giftLine, pointsLine].filter(Boolean).join(' + ') || 'لا شيء';
 }
 
 async function finish(state, winnerId) {
@@ -209,4 +276,4 @@ function getAllGuildConfigsSafe() {
     try { return require('./guildConfig').getAllGuildConfigs(); } catch { return {}; }
 }
 
-module.exports = { startFunScheduler, runEventNow, runRound, handleFunButton };
+module.exports = { startFunScheduler, runEventNow, runRound, handleFunButton, GIFT_TYPES };

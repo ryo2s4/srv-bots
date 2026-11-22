@@ -2074,6 +2074,33 @@ client.on('interactionCreate', async interaction => {
                     prize: [['points', 'Luna Points للفائز', String(c.prizePoints || 100)]],
                     gifts: [['gifts', 'الهدايا (سطر لكل هدية: الاسم|الندرة|نقاط)', (c.gifts || []).map((g) => `${g.name}|${g.rarity || 'common'}|${g.points || 0}`).join('\n').slice(0, 1000)]]
                 };
+                if (action === 'gifts') {
+                    const { StringSelectMenuBuilder } = require('discord.js');
+                    const { GIFT_TYPES } = require('./funEvents');
+                    const chosen = Array.isArray(c.gifts) ? c.gifts : [];
+                    const menu = new StringSelectMenuBuilder()
+                        .setCustomId('funui:gifts:select')
+                        .setPlaceholder('اختر الهدايا اللي تدخل السحب')
+                        .setMinValues(0)
+                        .setMaxValues(Object.keys(GIFT_TYPES).length)
+                        .addOptions(
+                            Object.entries(GIFT_TYPES).map(([key, g]) => ({
+                                label: g.name.slice(0, 100),
+                                value: key,
+                                description: `ندرة: ${g.rarity}`,
+                                default: chosen.includes(key)
+                            }))
+                        );
+                    try {
+                        await interaction.reply({
+                            content: '🎁 اختر الهدايا (كل ما كانت أندر قلّ احتمالها):',
+                            components: [new ActionRowBuilder().addComponents(menu)],
+                            flags: MessageFlags.Ephemeral
+                        });
+                    } catch { /* ignore */ }
+                    return;
+                }
+
                 const f = fields[action];
                 if (action === 'count') {
                     const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
@@ -2104,6 +2131,15 @@ client.on('interactionCreate', async interaction => {
             return;
         }
 
+        if (interaction.isStringSelectMenu && interaction.isStringSelectMenu() && interaction.customId === 'funui:gifts:select') {
+            if (!interaction.guild) return;
+            const gifts = Array.isArray(interaction.values) ? interaction.values : [];
+            updateGuildConfig(interaction.guild.id, (g) => ({ ...g, funEvents: { ...(g.funEvents || {}), gifts } }));
+            const p = require('./commands/fun').panel(interaction.guild.id, interaction.user.tag);
+            try { await interaction.update({ content: `✅ تم حفظ ${gifts.length} هدية.`, embeds: [p.embed], components: p.components }); } catch { /* ignore */ }
+            return;
+        }
+
         if (interaction.isModalSubmit() && typeof interaction.customId === 'string' && interaction.customId.startsWith('funModal:')) {
             if (!interaction.guild) return;
             const action = interaction.customId.split(':')[1];
@@ -2119,15 +2155,6 @@ client.on('interactionCreate', async interaction => {
                 update({ minEvents: lo, maxEvents: hi });
             }
             if (action === 'prize') update({ prizePoints: Math.max(0, Number(interaction.fields.getTextInputValue('points')) || 0) });
-            if (action === 'gifts') {
-                const gifts = String(interaction.fields.getTextInputValue('gifts') || '')
-                    .split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 25)
-                    .map((l) => {
-                        const [name, rarity, points] = l.split('|').map((s) => String(s || '').trim());
-                        return name ? { name: name.slice(0, 80), rarity: (rarity || 'common').slice(0, 20), points: Math.max(0, Number(points) || 0) } : null;
-                    }).filter(Boolean);
-                update({ gifts });
-            }
             const p = require('./commands/fun').panel(interaction.guild.id, interaction.user.tag);
             try { await interaction.reply({ embeds: [p.embed], components: p.components, flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
             return;

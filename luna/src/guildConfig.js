@@ -395,7 +395,15 @@ function normalizeConfig(cfg) {
         if (typeof f.nextAt !== 'number' || Number.isNaN(f.nextAt)) { f.nextAt = 0; changed = true; }
         if (typeof f.prizePoints !== 'number' || Number.isNaN(f.prizePoints)) { f.prizePoints = base.prizePoints; changed = true; }
         if (typeof f.giveawayMinutes !== 'number' || Number.isNaN(f.giveawayMinutes)) { f.giveawayMinutes = base.giveawayMinutes; changed = true; }
+        const giftKeys = ['xp_potion', 'points_potion', 'levelup_potion', 'points', 'coupon', 'generous_xp', 'rune'];
         if (!Array.isArray(f.gifts)) { f.gifts = []; changed = true; }
+        const normalizedGifts = [];
+        for (const g of f.gifts) {
+            let key = typeof g === 'string' ? g : (g && (g.key || g.name));
+            if (giftKeys.includes(key) && !normalizedGifts.includes(key)) normalizedGifts.push(key);
+        }
+        if (normalizedGifts.length !== f.gifts.length) changed = true;
+        f.gifts = normalizedGifts;
         out.funEvents = f;
     }
 
