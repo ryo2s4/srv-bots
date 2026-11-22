@@ -2053,7 +2053,7 @@ client.on('interactionCreate', async interaction => {
         // V11.6 fun events: admin panel.
         if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('funui:')) {
             if (!interaction.guild) return;
-            if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
+            if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionsBitField.Flags.ManageGuild)) {
                 return replyEphemeral(interaction, { content: 'تحتاج Manage Server 3:' });
             }
             const action = interaction.customId.split(':')[1];
