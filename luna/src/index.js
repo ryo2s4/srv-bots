@@ -2071,7 +2071,8 @@ client.on('interactionCreate', async interaction => {
                     giveaway: [['id', 'Channel ID أو <#...>', c.giveawayChannelId || '']],
                     role: [['id', 'Role ID أو <@&...>', c.roleId || '']],
                     interval: [['hours', 'كم ساعة بين حدث وثاني؟', String(c.intervalHours || 24)]],
-                    prize: [['points', 'Luna Points للفائز', String(c.prizePoints || 100)]],
+                    prize: [['points', 'Luna Points للفائز (دائمًا)', String(c.prizePoints || 100)]],
+                    giftchance: [['percent', 'احتمال نزول هدية إضافية %', String(c.giftChancePct == null ? 30 : c.giftChancePct)]],
                     gifts: [['gifts', 'الهدايا (سطر لكل هدية: الاسم|الندرة|نقاط)', (c.gifts || []).map((g) => `${g.name}|${g.rarity || 'common'}|${g.points || 0}`).join('\n').slice(0, 1000)]]
                 };
                 if (action === 'gifts') {
@@ -2155,6 +2156,7 @@ client.on('interactionCreate', async interaction => {
                 update({ minEvents: lo, maxEvents: hi });
             }
             if (action === 'prize') update({ prizePoints: Math.max(0, Number(interaction.fields.getTextInputValue('points')) || 0) });
+            if (action === 'giftchance') update({ giftChancePct: Math.max(0, Math.min(100, Number(interaction.fields.getTextInputValue('percent')) || 0)) });
             const p = require('./commands/fun').panel(interaction.guild.id, interaction.user.tag);
             try { await interaction.reply({ embeds: [p.embed], components: p.components, flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
             return;

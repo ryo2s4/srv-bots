@@ -13,7 +13,8 @@ function panel(guildId, tag) {
             `**الرتبة المستهدفة:** ${c.roleId ? `<@&${c.roleId}>` : '—'}\n` +
             `**التكرار:** كل ${c.intervalHours || 24} ساعة\n` +
             `**فعاليات كل جولة:** ${c.minEvents || 2} - ${c.maxEvents || 5}\n` +
-            `**الجائزة:** ${c.prizePoints || 100} Luna Points\n` +
+            `**الجائزة:** ${c.prizePoints || 100} Luna Points (دائمًا)\n` +
+            `**احتمال الهدية الإضافية:** ${c.giftChancePct == null ? 30 : c.giftChancePct}%\n` +
             `**مدة الجيف أواي:** ${c.giveawayMinutes || 5} دقائق\n` +
             `**الهدايا:** ${(c.gifts || []).length}`
         )
@@ -28,7 +29,8 @@ function panel(guildId, tag) {
             new ButtonBuilder().setCustomId('funui:interval').setLabel('التكرار').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('funui:prize').setLabel('الجائزة').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('funui:gifts').setLabel('الهدايا والندرة').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('funui:count').setLabel('عدد الفعاليات').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('funui:count').setLabel('عدد الفعاليات').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('funui:giftchance').setLabel('احتمال الهدية').setStyle(ButtonStyle.Secondary)
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('funui:toggle').setLabel(c.enabled ? '⛔ إيقاف' : '✅ تفعيل').setStyle(c.enabled ? ButtonStyle.Danger : ButtonStyle.Success),

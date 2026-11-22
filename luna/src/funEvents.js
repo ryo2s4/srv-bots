@@ -109,9 +109,11 @@ function buildEventEmbed(state) {
 }
 
 async function award(guildId, userId, state) {
-    const giftLine = state.gift ? await applyGift(guildId, userId, state.gift, state.prize) : '';
-    const pointsLine = state.gift === 'points' ? '' : `${Number(state.prize) || 0} Luna Points`;
-    return [giftLine, pointsLine].filter(Boolean).join(' + ') || 'لا شيء';
+    // Points are always awarded. Gifts are an extra random bonus on top.
+    const base = Number(state.prize) || 0;
+    try { addLunaPoints(guildId, userId, base); } catch { /* ignore */ }
+    const giftLine = state.gift ? await applyGift(guildId, userId, state.gift, base) : '';
+    return [`${base} Luna Points`, giftLine].filter(Boolean).join(' + ');
 }
 
 async function finish(state, winnerId) {
@@ -160,7 +162,9 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
         ? { parse: [], roles: [String(c.roleId)] }
         : { parse: [] };
 
-    const gift = pickWeighted(c.gifts);
+    // Gifts are a bonus drop, not a guaranteed reward.
+    const chance = Math.max(0, Math.min(100, Number(c.giftChancePct) || 0));
+    const gift = Math.random() * 100 < chance ? pickWeighted(c.gifts) : null;
     const id = `fun_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     let resolveDone;
     const done = new Promise((r) => { resolveDone = r; });
