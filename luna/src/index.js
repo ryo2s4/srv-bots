@@ -4207,6 +4207,54 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
+        // Source chooser: local / online.
+        if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musicview:')) {
+            if (!interaction.guild) return;
+            const which = String(interaction.customId.split(':')[1] || '');
+            const nextMode = which === 'online' ? 'tray' : (which === 'choose' ? 'choose' : 'panel');
+            try { client.music.__getSession(interaction.guild.id).viewMode = nextMode; } catch { /* ignore */ }
+            await deferUpdateSafe(interaction);
+            await refreshMusicPanelMessage(interaction.guild.id).catch(() => null);
+            return;
+        }
+
+        // Volume button opens a modal where the user types the level (0-200%).
+        if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musicsetvolume:')) {
+            if (!interaction.guild) return;
+            try {
+                const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+                const session = client.music.__getSession(interaction.guild.id);
+                const current = Math.round(Math.max(0, Math.min(2, Number(session.volume) || 1)) * 100);
+                const modal = new ModalBuilder()
+                    .setCustomId('musicModal:volume')
+                    .setTitle('مستوى الصوت');
+                const input = new TextInputBuilder()
+                    .setCustomId('level')
+                    .setLabel('الصوت من 0 إلى 200 (مثال: 80)')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setValue(String(current));
+                modal.addComponents(new ActionRowBuilder().addComponents(input));
+                await interaction.showModal(modal);
+            } catch { /* panel expired */ }
+            return;
+        }
+
+        if (interaction.isModalSubmit() && interaction.customId === 'musicModal:volume') {
+            if (!interaction.guild) return;
+            try { await interaction.deferReply({ flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
+            try {
+                const raw = String(interaction.fields.getTextInputValue('level') || '').trim();
+                const level = Math.max(0, Math.min(200, Math.round(Number(raw) || 0)));
+                client.music.setVolume(interaction.guild.id, level / 100);
+                await refreshMusicPanelMessage(interaction.guild.id).catch(() => null);
+                await interaction.editReply({ content: `✅ تم ضبط الصوت على **${level}%**` });
+            } catch (err) {
+                try { await interaction.editReply({ content: `❌ ${String(err && err.message ? err.message : err).slice(0, 300)}` }); } catch { /* ignore */ }
+            }
+            return;
+        }
+
         // Online music: switching to the tray player is a separate action from
         // entering a link. The link input lives inside the tray itself.
         if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musiconline:')) {
@@ -4316,7 +4364,7 @@ client.on('interactionCreate', async interaction => {
                 }
             }
 
-            if (action === 'play') {
+            if (action === 'play' || action === 'resume') {
                 const res = await resumeGuildPlayback(interaction);
                 if (!res.ok) {
                     return replyEphemeral(interaction, { content: `اسفة بس ${res.error || 'ما قدرت أكمل التشغيل'} 3:` });
@@ -5246,6 +5294,7 @@ client.on('interactionCreate', async interaction => {
 
         if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musiccat:')) {
             if (!interaction.guild) return;
+            try { client.music.__getSession(interaction.guild.id).viewMode = 'panel'; } catch { /* ignore */ }
 
             const { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
             const fs = require('fs');

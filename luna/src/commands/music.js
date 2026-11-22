@@ -16,18 +16,13 @@ module.exports = {
         // Defer immediately to avoid Unknown interaction timeout
         await interaction.deferReply();
 
-        const built = interaction.client.music.buildNowPlayingEmbed(interaction.guild.id);
-        const embed = built && built.embed
-            ? built.embed
-            : UI.embed({
-                title: '🎧 لوحة الموسيقى',
-                description: '🟣 **جاهزين للتشغيل**\n\n> 🎵 ما فيه شي شغال',
-                color: UI.COLORS.music,
-                footerText: 'لونا هنا عشان تخلي السهرة ألطف ✨'
-            });
+        // Every /music run starts with the source chooser.
+        const session = interaction.client.music.__getSession(interaction.guild.id);
+        session.viewMode = 'choose';
 
-        const musicUI = require('../music/musicUI');
-        const rows = musicUI.buildPanelRows(interaction.user.id, (built && built.state) || null, interaction.client.music.__getSession(interaction.guild.id));
+        const built = interaction.client.music.buildChooserView(interaction.guild.id, interaction.user.id);
+        const embed = built && built.embed;
+        const rows = built && built.components;
 
         const msg = await interaction.editReply({ embeds: [embed], components: rows });
         try {

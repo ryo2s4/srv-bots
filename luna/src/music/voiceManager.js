@@ -456,7 +456,10 @@ async function playNextFromQueue(guildId) {
 
     const source = trackSource(next);
     if (!source) return false;
-    await startPlaybackFromFile(makeInternalInteraction(guildId, next.requestedBy), source, next.displayName || source, { durationMs: next.durationMs });
+    await startPlaybackFromFile(makeInternalInteraction(guildId, next.requestedBy), source, next.displayName || source, {
+        durationMs: next.durationMs,
+        discBuffer: next.discBuffer
+    });
     return true;
 }
 
@@ -866,7 +869,10 @@ async function startPlaybackFromFile(interaction, filePath, displayName, meta = 
             // ignore
         }
         session.currentResource = resource;
-        const extra = isUrl ? { url: filePath, source: 'url' } : {};
+        const extra = {
+            ...(isUrl ? { url: filePath, source: 'url' } : {}),
+            ...(meta && meta.discBuffer ? { discBuffer: meta.discBuffer } : {})
+        };
         session.lastTrack = { filePath, displayName, ...extra };
         session.currentTrack = {
             filePath, displayName, ...extra,

@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const UI = require('../utils/ui');
 const { getOrCreateVoiceSession, buildMusicState, getPlaybackProgressMs, putPlayBrowseCache, getPlayBrowseCache, listCategoryFiles, AUDIO_CATEGORIES } = require('./voiceManager');
 const { logError } = require('../utils/log');
@@ -19,25 +19,23 @@ function buildPanelRows(resolvedOwner, state = null, session = null) {
     const owner = resolvedOwner && resolvedOwner !== '0' ? resolvedOwner : '0';
 
     const row1 = UI.row(
-        UI.btn(`musiccat:anashid:${owner}`, 'اناشيد'),
-        UI.btn(`musiccat:halal:${owner}`, 'موسيقى حلال'),
-        UI.btn(`musiccat:quran:${owner}`, 'قران'),
         UI.btn(`musiccat:shiir:${owner}`, 'شعر'),
-        UI.btn(`musiconline:${owner}`, 'أونلاين', { style: ButtonStyle.Success, emoji: '🌐' })
+        UI.btn(`musiccat:quran:${owner}`, 'قران'),
+        UI.btn(`musiccat:halal:${owner}`, 'موسيقى حلال'),
+        UI.btn(`musiccat:anashid:${owner}`, 'اناشيد')
     );
     const row2 = UI.row(
-        UI.btn('musicctl:queue', 'قائمة الانتظار'),
-        UI.btn('musicctl:seekback', '-15ث', { emoji: '⏪' }),
-        UI.btn('musicctl:seekfwd', '+15ث', { emoji: '⏩' }),
-        UI.btn('musicctl:skip', 'تخطي', { style: ButtonStyle.Danger }),
-        UI.btn(`musicsettings:${owner}`, 'إعدادات', { style: ButtonStyle.Primary })
+        UI.btn(`musicsetvolume:${owner}`, '🔊 Volume'),
+        UI.btn('musicctl:stop', '⏹️ Stop', { style: ButtonStyle.Danger }),
+        UI.btn('musicctl:pause', '⏸️ Pause', { style: ButtonStyle.Secondary }),
+        UI.btn('musicctl:play', '▶️ Resume', { style: ButtonStyle.Success }),
+        UI.btn('musicctl:queue', '📥 Playlist', { style: ButtonStyle.Primary })
     );
     const row3 = UI.row(
-        UI.btn('musicctl:pause', 'إيقاف مؤقت', { style: ButtonStyle.Danger }),
-        UI.btn('musicctl:play', 'تشغيل', { style: ButtonStyle.Success }),
-        UI.btn('musicctl:repeat', 'التكرار'),
-        UI.btn('musicctl:voldown', 'صوت -'),
-        UI.btn('musicctl:volup', 'صوت +')
+        UI.btn(`musicsettings:${owner}`, '⚙️ إعدادات', { style: ButtonStyle.Secondary }),
+        UI.btn('musicctl:skip', '⏭️ تخطي', { style: ButtonStyle.Secondary }),
+        UI.btn(`musicview:choose:${owner}`, '🔙 اختيار المصدر', { style: ButtonStyle.Secondary }),
+        UI.btn(`musiconline:${owner}`, '🌐 أونلاين', { style: ButtonStyle.Success })
     );
     return [row1, row2, row3];
 }
@@ -62,18 +60,48 @@ async function refreshMusicPanelMessage(guildId, client) {
         const resolvedOwner = ownerId || (session && session.lastPanelOwnerId ? String(session.lastPanelOwnerId) : null) || null;
         if (!resolvedOwner || resolvedOwner === '0') return;
 
-        const tray = session && session.viewMode === 'tray';
-        const built = tray ? buildTrayPlayerView(guildId, resolvedOwner) : buildNowPlayingEmbed(guildId);
+        const mode = session && session.viewMode ? session.viewMode : 'panel';
+        let built;
+        if (mode === 'choose') built = buildChooserView(guildId, resolvedOwner);
+        else if (mode === 'tray') built = buildTrayPlayerView(guildId, resolvedOwner);
+        else built = buildNowPlayingEmbed(guildId);
+
         const embed = built && built.embed ? built.embed : null;
         if (!embed) return;
 
-        const components = tray
+        const components = built.components
             ? built.components
             : buildPanelRows(resolvedOwner, built.state, session);
-        await msg.edit({ embeds: [embed], components }).catch(() => null);
+        const payload = { embeds: [embed], components };
+        if (built.files && built.files.length) payload.files = built.files;
+        await msg.edit(payload).catch(() => null);
     } catch (e) {
         logError('Music UI - failed to refresh panel message', e, { guildId });
     }
+}
+
+// First screen when /music runs: pick the source.
+function buildChooserView(guildId, ownerId = null) {
+    const session = getOrCreateVoiceSession(guildId);
+    const title = session.currentTrack && session.currentTrack.displayName;
+    const embed = UI.embed({
+        title: '🎧 لوحة الموسيقى',
+        color: UI.COLORS.music,
+        description:
+            'من وين تحب تشغّل؟\n\n' +
+            '💾 **محلي** — ملفات لونا المعروضة (اناشيد، قران، موسيقى حلال، شعر)\n' +
+            '🌐 **أونلاين** — مشغّل YouTube مع قرص الألبوم والتقدم والوقت\n\n' +
+            (title ? `> الآن: **${String(title).slice(0, 200)}**` : ''),
+        footerText: 'اختر مصدر واحد وبعدين تحكم بالتشغيل من الأزرار'
+    });
+    const owner = ownerId || session.lastPanelOwnerId || '0';
+    const rows = [
+        UI.row(
+            UI.btn(`musicview:local:${owner}`, '💾 محلي', { style: ButtonStyle.Primary }),
+            UI.btn(`musicview:online:${owner}`, '🌐 أونلاين', { style: ButtonStyle.Success })
+        )
+    ];
+    return { embed, components: rows };
 }
 
 // Compact "tray player" shown after starting an online track: one big title,
@@ -97,6 +125,12 @@ function buildTrayPlayerView(guildId, ownerId = null) {
     const queueLen = Array.isArray(session.queue) ? session.queue.length : 0;
     const requestedBy = session.currentTrack && session.currentTrack.requestedBy
         ? `<@${String(session.currentTrack.requestedBy)}>` : '—';
+    const channelName = session.voiceChannelRef && session.voiceChannelRef.name
+        ? String(session.voiceChannelRef.name)
+        : (session.voiceChannelId ? `<#${session.voiceChannelId}>` : '—');
+    const authorName = session.currentTrack && session.currentTrack.channel
+        ? String(session.currentTrack.channel).slice(0, 200)
+        : null;
 
     const embed = UI.embed({
         title: '🎵 مشغّل الموسيقى',
@@ -105,37 +139,45 @@ function buildTrayPlayerView(guildId, ownerId = null) {
             `${status}\n\n` +
             `> **🎶 ${title.slice(0, 256)}**\n\n` +
             (bar ? `${bar}\n` : '') +
-            `**⏱️ ${progress}**`,
+            `**⏱️ ${progress}**\n` +
+            `**🕒 ${UI.fmtMmSs(durMs)}** كامل المقطع · **⏳ ${UI.fmtMmSs(elapsedMs)}** منقضي`,
         fields: [
             { name: 'المصدر', value: source, inline: true },
             { name: '🔊 الصوت', value: `**${volPct}%**`, inline: true },
             { name: '📥 بالقائمة', value: `**${queueLen}**`, inline: true },
             { name: '🫶 مطلوب بواسطة', value: requestedBy, inline: true },
-            { name: '🔁 التكرار', value: repeatModeLabel(session), inline: true }
+            { name: '🎤 القناة', value: channelName, inline: true },
+            ...(authorName ? [{ name: '🎼 القناة/المؤلف', value: authorName, inline: true }] : [])
         ],
-        footerText: 'استخدم الأزرار للتحكم • 🎛️ ترجع للوحة الكاملة'
+        footerText: '💿 القرص يوضّح صورة المقطع • الأزرار للتحكم'
     });
 
+    // Circular album art referenced from the same message (no external host).
+    const files = [];
+    const disc = session.currentTrack && session.currentTrack.discBuffer;
+    if (disc && Buffer.isBuffer(disc)) {
+        files.push(new AttachmentBuilder(disc, { name: 'disc.png' }));
+        embed.setImage('attachment://disc.png');
+    }
+
+    const owner = ownerId || session.lastPanelOwnerId || '0';
     const rows = [
         UI.row(
-            UI.btn('musicctl:stop', '⏹️ إيقاف', { style: ButtonStyle.Danger }),
-            UI.btn('musicctl:pause', '⏸️ توقف مؤقت', { style: ButtonStyle.Secondary }),
-            UI.btn('musicctl:play', '▶️ تشغيل', { style: ButtonStyle.Success }),
-            UI.btn('musicctl:skip', '⏭️ تخطي', { style: ButtonStyle.Secondary })
+            UI.btn('musicctl:play', '▶️ Play', { style: ButtonStyle.Success }),
+            UI.btn(`musicsetvolume:${owner}`, '🔊 Volume', { style: ButtonStyle.Primary }),
+            UI.btn('musicctl:pause', '⏸️ Pause', { style: ButtonStyle.Secondary }),
+            UI.btn('musicctl:stop', '⏹️ Stop', { style: ButtonStyle.Danger }),
+            UI.btn('musicctl:resume', '⏵️ Resume', { style: ButtonStyle.Success })
         ),
         UI.row(
-            UI.btn('musicctl:voldown', '🔉 صوت -', { style: ButtonStyle.Secondary }),
-            UI.btn('musicctl:volup', '🔊 صوت +', { style: ButtonStyle.Secondary }),
-            UI.btn('musicctl:repeat', '🔁 التكرار', { style: ButtonStyle.Secondary }),
+            UI.btn(`musiconput:${owner}`, '🔗 رابط / اسم أغنية', { style: ButtonStyle.Success }),
+            UI.btn('musicctl:skip', '⏭️ تخطي', { style: ButtonStyle.Secondary }),
             UI.btn('musicctl:queue', '📥 القائمة', { style: ButtonStyle.Secondary }),
-            UI.btn('musicctl:panel', '🎛️ اللوحة', { style: ButtonStyle.Primary })
-        ),
-        UI.row(
-            UI.btn(`musiconput:${ownerId || '0'}`, '🔗 رابط / اسم أغنية', { style: ButtonStyle.Success })
+            UI.btn(`musicview:choose:${owner}`, '🔙 المصدر', { style: ButtonStyle.Secondary })
         )
     ];
 
-    return { embed, components: rows, state };
+    return { embed, components: rows, files, state };
 }
 
 function buildNowPlayingEmbed(guildId) {
@@ -273,6 +315,7 @@ module.exports = {
     refreshMusicPanelMessage,
     buildNowPlayingEmbed,
     buildTrayPlayerView,
+    buildChooserView,
     getQueueLines,
     buildPanelRows,
     // Alias kept for older call sites

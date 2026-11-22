@@ -32,8 +32,8 @@ const {
     fmtMmSs,
     voiceSessions
 } = require('./voiceManager');
-const { resolveTrack } = require('./ytdlp');
-const { refreshMusicPanelMessage, buildNowPlayingEmbed, getQueueLines, buildPanelRows, buildCategoryBrowseView } = require('./musicUI');
+const { resolveTrack, makeDiscBuffer } = require('./ytdlp');
+const { refreshMusicPanelMessage, buildNowPlayingEmbed, buildChooserView, getQueueLines, buildPanelRows, buildCategoryBrowseView } = require('./musicUI');
 
 function createMusicAPI(client) {
     // Let the playback engine refresh the panel embed (progress bar etc.)
@@ -55,6 +55,9 @@ function createMusicAPI(client) {
         },
         buildPanelRows,
         buildMusicPanelRows: buildPanelRows,
+        buildChooserView(guildId, ownerId) {
+            return buildChooserView(guildId, ownerId);
+        },
         async refreshPanel(guildId) {
             return refreshMusicPanelMessage(guildId, client);
         },
@@ -91,6 +94,7 @@ function createMusicAPI(client) {
         },
         async playOnline(interaction, query) {
             const track = await resolveTrack(query);
+            const discBuffer = await makeDiscBuffer(track.thumbnail).catch(() => null);
             const guildId = interaction.guild.id;
             const session = getOrCreateVoiceSession(guildId);
             // Switch the existing music panel into the compact tray player.
@@ -102,13 +106,15 @@ function createMusicAPI(client) {
                 source: 'url',
                 displayName: track.title,
                 durationMs: track.durationMs,
+                discBuffer,
+                channel: track.channel,
                 requestedBy: interaction.user && interaction.user.id ? String(interaction.user.id) : null
             };
             if (playing || session.paused) {
                 addToQueue(guildId, entry);
                 return { queued: true, title: track.title };
             }
-            await startPlaybackFromUrl(interaction, track.url, track.title, { durationMs: track.durationMs });
+            await startPlaybackFromUrl(interaction, track.url, track.title, { durationMs: track.durationMs, discBuffer });
             return { queued: false, title: track.title };
         },
         addToQueue(guildId, track) {
