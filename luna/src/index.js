@@ -2111,10 +2111,10 @@ client.on('interactionCreate', async interaction => {
                     const modal = new ModalBuilder().setCustomId('funModal:count').setTitle('عدد الفعاليات في الجولة');
                     modal.addComponents(
                         new ActionRowBuilder().addComponents(
-                            new TextInputBuilder().setCustomId('min').setLabel('الأقل (2-5)').setStyle(TextInputStyle.Short).setRequired(false).setValue(String(c.minEvents || 2))
+                            new TextInputBuilder().setCustomId('min').setLabel('الأقل (2-10)').setStyle(TextInputStyle.Short).setRequired(false).setValue(String(c.minEvents || 2))
                         ),
                         new ActionRowBuilder().addComponents(
-                            new TextInputBuilder().setCustomId('max').setLabel('الأكثر (2-5)').setStyle(TextInputStyle.Short).setRequired(false).setValue(String(c.maxEvents || 5))
+                            new TextInputBuilder().setCustomId('max').setLabel('الأكثر (2-10)').setStyle(TextInputStyle.Short).setRequired(false).setValue(String(c.maxEvents || 5))
                         )
                     );
                     try { await interaction.showModal(modal); } catch { /* ignore */ }
@@ -2154,8 +2154,8 @@ client.on('interactionCreate', async interaction => {
             if (action === 'role') update({ roleId: cleanId(interaction.fields.getTextInputValue('id')) || null });
             if (action === 'interval') update({ intervalHours: Math.max(1, Number(interaction.fields.getTextInputValue('hours')) || 24), nextAt: 0 });
             if (action === 'count') {
-                const lo = Math.max(2, Math.min(5, Number(interaction.fields.getTextInputValue('min')) || 2));
-                const hi = Math.max(lo, Math.min(5, Number(interaction.fields.getTextInputValue('max')) || 5));
+                const lo = Math.max(2, Math.min(10, Number(interaction.fields.getTextInputValue('min')) || 2));
+                const hi = Math.max(lo, Math.min(10, Number(interaction.fields.getTextInputValue('max')) || 10));
                 update({ minEvents: lo, maxEvents: hi });
             }
             if (action === 'prize') update({ prizePoints: Math.max(0, Number(interaction.fields.getTextInputValue('points')) || 0) });

@@ -234,8 +234,8 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
 // event waits for a winner or its timer before the next one starts.
 async function runRound(guildId, client) {
     const cfg = getGuildConfig(guildId).funEvents || {};
-    const lo = Math.max(1, Math.min(5, Number(cfg.minEvents) || 2));
-    const hi = Math.max(lo, Math.min(5, Number(cfg.maxEvents) || 5));
+    const lo = Math.max(1, Math.min(10, Number(cfg.minEvents) || 2));
+    const hi = Math.max(lo, Math.min(10, Number(cfg.maxEvents) || 5));
     const total = lo + Math.floor(Math.random() * (hi - lo + 1));
 
     // Every round starts with exactly one giveaway (in the giveaway channel),
