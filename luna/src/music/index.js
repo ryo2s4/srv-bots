@@ -15,6 +15,7 @@ const {
     putPlayBrowseCache,
     getPlayBrowseCache,
     startPlaybackFromFile,
+    startPlaybackFromUrl,
     makeInternalInteraction,
     setPanelRefresher,
     AUDIO_CATEGORIES,
@@ -31,6 +32,7 @@ const {
     fmtMmSs,
     voiceSessions
 } = require('./voiceManager');
+const { resolveTrack } = require('./ytdlp');
 const { refreshMusicPanelMessage, buildNowPlayingEmbed, getQueueLines, buildPanelRows, buildCategoryBrowseView } = require('./musicUI');
 
 function createMusicAPI(client) {
@@ -83,6 +85,29 @@ function createMusicAPI(client) {
         },
         async play(interaction, filePath, displayName) {
             return startPlaybackFromFile(interaction, filePath, displayName);
+        },
+        async resolveOnline(query) {
+            return resolveTrack(query);
+        },
+        async playOnline(interaction, query) {
+            const track = await resolveTrack(query);
+            const guildId = interaction.guild.id;
+            const session = getOrCreateVoiceSession(guildId);
+            const playing = !!(session.player && session.player.state && session.player.state.status && session.player.state.status !== 'idle');
+            const entry = {
+                filePath: track.url,
+                url: track.url,
+                source: 'url',
+                displayName: track.title,
+                durationMs: track.durationMs,
+                requestedBy: interaction.user && interaction.user.id ? String(interaction.user.id) : null
+            };
+            if (playing || session.paused) {
+                addToQueue(guildId, entry);
+                return { queued: true, title: track.title };
+            }
+            await startPlaybackFromUrl(interaction, track.url, track.title);
+            return { queued: false, title: track.title };
         },
         addToQueue(guildId, track) {
             return addToQueue(guildId, track);

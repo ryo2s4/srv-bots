@@ -5,6 +5,19 @@ const { logError } = require('../utils/log');
 const voiceSessions = new Map();
 const playBrowseCache = new Map();
 
+// A track is either a local file (filePath) or an online stream (url).
+// Keep the `filePath` field for both so all existing resume/seek/skip logic
+// keeps working — ffmpeg accepts a local path or an http(s) URL equally.
+function trackSource(track) {
+    if (!track) return null;
+    if (typeof track.url === 'string' && isHttpSource(track.url)) return track.url;
+    if (typeof track.filePath === 'string' && track.filePath) return track.filePath;
+    return null;
+}
+function isHttpSource(src) {
+    return /^https?:\/\//i.test(String(src || ''));
+}
+
 // Registered by createMusicAPI(client) so playback can refresh the music panel UI.
 let panelRefresher = null;
 function setPanelRefresher(fn) {
@@ -334,10 +347,11 @@ async function resumeGuildPlayback(interaction) {
     try {
         if (!interaction || !interaction.guild) return { ok: false, error: 'ما فيه سيرفر' };
         const session = getOrCreateVoiceSession(interaction.guild.id);
-        if (!session || !session.paused || !session.currentTrack || !session.currentTrack.filePath) {
+        const source = trackSource(session && session.currentTrack);
+        if (!session || !session.paused || !source) {
             return { ok: false, error: 'ما فيه شي موقوف مؤقتاً' };
         }
-        await startPlaybackFromFile(interaction, session.currentTrack.filePath, session.currentTrack.displayName || session.currentTrack.filePath);
+        await startPlaybackFromFile(interaction, source, session.currentTrack.displayName || source);
         return { ok: true };
     } catch {
         return { ok: false, error: 'ما قدرت أكمل التشغيل' };
@@ -348,7 +362,8 @@ async function resumeGuildPlayback(interaction) {
 // Works while playing or paused: restarts ffmpeg at the new offset.
 async function seekByMs(guildId, deltaMs) {
     const session = getOrCreateVoiceSession(guildId);
-    if (!session.currentTrack || !session.currentTrack.filePath) {
+    const source = trackSource(session.currentTrack);
+    if (!source) {
         return { ok: false, error: 'ما فيه شي شغال' };
     }
 
@@ -368,8 +383,8 @@ async function seekByMs(guildId, deltaMs) {
     try {
         await startPlaybackFromFile(
             makeInternalInteraction(guildId, session.currentTrack.requestedBy),
-            session.currentTrack.filePath,
-            session.currentTrack.displayName || session.currentTrack.filePath
+            source,
+            session.currentTrack.displayName || source
         );
         return { ok: true, positionMs: targetMs, durationMs: durMs };
     } catch {
@@ -393,8 +408,9 @@ async function skipGuildTrack(guildId) {
             await playNextFromQueue(guildId);
             return;
         }
-        if (repeatMode === 'all' && session.lastTrack && session.lastTrack.filePath) {
-            session.queue.push({ filePath: session.lastTrack.filePath, displayName: session.lastTrack.displayName, requestedBy: session.currentTrack && session.currentTrack.requestedBy });
+        const lastSource = trackSource(session.lastTrack);
+        if (repeatMode === 'all' && lastSource) {
+            session.queue.push({ ...session.lastTrack, filePath: lastSource, requestedBy: session.currentTrack && session.currentTrack.requestedBy });
             await playNextFromQueue(guildId);
             return;
         }
@@ -438,7 +454,9 @@ async function playNextFromQueue(guildId) {
     const next = shiftNextQueuedTrack(guildId);
     if (!next) return false;
 
-    await startPlaybackFromFile(makeInternalInteraction(guildId, next.requestedBy), next.filePath, next.displayName);
+    const source = trackSource(next);
+    if (!source) return false;
+    await startPlaybackFromFile(makeInternalInteraction(guildId, next.requestedBy), source, next.displayName || source);
     return true;
 }
 
@@ -600,7 +618,8 @@ async function startPlaybackFromFile(interaction, filePath, displayName) {
     }
 
     try {
-        const sameFile = !!(session.currentTrack && session.currentTrack.filePath && String(session.currentTrack.filePath) === String(filePath));
+        const currentSource = trackSource(session.currentTrack);
+        const sameFile = !!(currentSource && String(currentSource) === String(filePath));
         const isResume = !!(session.paused && sameFile);
         const isSeek = !!session.__seekRestart && sameFile;
         if (!isResume && !isSeek) {
@@ -783,7 +802,9 @@ async function startPlaybackFromFile(interaction, filePath, displayName) {
         const startOffsetMs = Math.max(0, Math.floor(Number(session.trackOffsetMs) || 0));
         const startOffsetSec = startOffsetMs ? (startOffsetMs / 1000) : 0;
 
+        const isUrl = isHttpSource(filePath);
         const ffmpegArgs = [
+            ...(isUrl ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'] : []),
             ...(startOffsetSec ? ['-ss', String(startOffsetSec)] : []),
             '-i', filePath,
             '-vn',
@@ -821,8 +842,12 @@ async function startPlaybackFromFile(interaction, filePath, displayName) {
             // ignore
         }
         session.currentResource = resource;
-        session.lastTrack = { filePath, displayName };
-        session.currentTrack = { filePath, displayName, requestedBy: interaction.user && interaction.user.id ? String(interaction.user.id) : null };
+        const extra = isUrl ? { url: filePath, source: 'url' } : {};
+        session.lastTrack = { filePath, displayName, ...extra };
+        session.currentTrack = {
+            filePath, displayName, ...extra,
+            requestedBy: interaction.user && interaction.user.id ? String(interaction.user.id) : null
+        };
         try {
             session.paused = false;
             if (typeof session.trackOffsetMs !== 'number') session.trackOffsetMs = 0;
@@ -851,14 +876,15 @@ async function startPlaybackFromFile(interaction, filePath, displayName) {
 
                 // Repeat-one: replay the current track (unless this end came from a manual skip)
                 if (repeatMode === 'one' && !wasSkip) {
-                    if (!session.lastTrack || !session.lastTrack.filePath) return;
-                    await startPlaybackFromFile(makeInternalInteraction(interaction.guild.id, session.currentTrack && session.currentTrack.requestedBy), session.lastTrack.filePath, session.lastTrack.displayName);
+                    const lastSource = trackSource(session.lastTrack);
+                    if (!lastSource) return;
+                    await startPlaybackFromFile(makeInternalInteraction(interaction.guild.id, session.currentTrack && session.currentTrack.requestedBy), lastSource, session.lastTrack.displayName || lastSource);
                     return;
                 }
 
                 // Repeat-all: cycle the finished track to the back of the queue
-                if (repeatMode === 'all' && session.lastTrack && session.lastTrack.filePath && !wasSkip) {
-                    session.queue.push({ filePath: session.lastTrack.filePath, displayName: session.lastTrack.displayName, requestedBy: session.currentTrack && session.currentTrack.requestedBy });
+                if (repeatMode === 'all' && trackSource(session.lastTrack) && !wasSkip) {
+                    session.queue.push({ ...session.lastTrack, requestedBy: session.currentTrack && session.currentTrack.requestedBy });
                 }
 
                 if (session.queue && session.queue.length) {
@@ -907,7 +933,14 @@ function fmtMmSs(ms) {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+// Online playback reuses the local-file pipeline: ffmpeg takes either a path
+// or an http(s) stream URL, so only the source representation differs.
+async function startPlaybackFromUrl(interaction, url, displayName) {
+    return startPlaybackFromFile(interaction, String(url), displayName || String(url));
+}
+
 module.exports = {
+    startPlaybackFromUrl,
     getOrCreateVoiceSession,
     normalizeTrackTitle,
     buildMusicState,

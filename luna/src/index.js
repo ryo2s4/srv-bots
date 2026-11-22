@@ -4207,6 +4207,48 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
+        // Online music: open a query modal from the music panel.
+        if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musiconline:')) {
+            if (!interaction.guild) return;
+            try {
+                const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+                const modal = new ModalBuilder()
+                    .setCustomId('musicModal:online')
+                    .setTitle('تشغيل أغنية من YouTube');
+                const query = new TextInputBuilder()
+                    .setCustomId('query')
+                    .setLabel('اسم الأغنية أو رابط YouTube')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setPlaceholder('مثلاً: أغنية عربية أو https://youtube.com/watch?v=...');
+                modal.addComponents(new ActionRowBuilder().addComponents(query));
+                await interaction.showModal(modal);
+            } catch {
+                // panel expired — ignore
+            }
+            return;
+        }
+
+        if (interaction.isModalSubmit() && interaction.customId === 'musicModal:online') {
+            if (!interaction.guild) return;
+            const text = String(interaction.fields.getTextInputValue('query') || '').trim();
+            try {
+                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                const result = await interaction.client.music.playOnline(interaction, text);
+                await interaction.editReply({
+                    content: result && result.queued
+                        ? `✅ تمت الإضافة للقائمة: **${result.title}**`
+                        : `✅ جاري التشغيل: **${result.title}**`
+                });
+                await interaction.client.music.refreshPanel(interaction.guild.id).catch(() => null);
+            } catch (err) {
+                try {
+                    await interaction.editReply({ content: `❌ ${String(err && err.message ? err.message : err).slice(0, 500)}` });
+                } catch { /* ignore */ }
+            }
+            return;
+        }
+
         if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musicctl:')) {
             if (!interaction.guild) return;
             await deferUpdateSafe(interaction);

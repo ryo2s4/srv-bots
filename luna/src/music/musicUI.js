@@ -22,7 +22,8 @@ function buildPanelRows(resolvedOwner, state = null, session = null) {
         UI.btn(`musiccat:anashid:${owner}`, 'اناشيد'),
         UI.btn(`musiccat:halal:${owner}`, 'موسيقى حلال'),
         UI.btn(`musiccat:quran:${owner}`, 'قران'),
-        UI.btn(`musiccat:shiir:${owner}`, 'شعر')
+        UI.btn(`musiccat:shiir:${owner}`, 'شعر'),
+        UI.btn(`musiconline:${owner}`, 'أونلاين', { style: ButtonStyle.Success, emoji: '🌐' })
     );
     const row2 = UI.row(
         UI.btn('musicctl:queue', 'قائمة الانتظار'),
