@@ -4256,6 +4256,12 @@ client.on('interactionCreate', async interaction => {
             const action = String(interaction.customId.split(':')[1] || '').trim();
             if (!action) return;
 
+            if (action === 'panel') {
+                try { client.music.__getSession(interaction.guild.id).viewMode = 'panel'; } catch { /* ignore */ }
+                await refreshMusicPanelMessage(interaction.guild.id).catch(() => null);
+                return replyEphemeral(interaction, { content: 'رجعنا للوحة الموسيقى الكاملة 3:' });
+            }
+
             if (action === 'skip') {
                 const res = await client.music.skip(interaction.guild.id);
                 if (!res.ok) {

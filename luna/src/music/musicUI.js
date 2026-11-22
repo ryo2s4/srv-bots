@@ -59,17 +59,80 @@ async function refreshMusicPanelMessage(guildId, client) {
         const msg = await ch.messages.fetch(messageId).catch(() => null);
         if (!msg) return;
 
-        const built = buildNowPlayingEmbed(guildId);
-        const embed = built && built.embed ? built.embed : null;
-        if (!embed) return;
-
         const resolvedOwner = ownerId || (session && session.lastPanelOwnerId ? String(session.lastPanelOwnerId) : null) || null;
         if (!resolvedOwner || resolvedOwner === '0') return;
 
-        await msg.edit({ embeds: [embed], components: buildPanelRows(resolvedOwner, built.state, session) }).catch(() => null);
+        const tray = session && session.viewMode === 'tray';
+        const built = tray ? buildTrayPlayerView(guildId, resolvedOwner) : buildNowPlayingEmbed(guildId);
+        const embed = built && built.embed ? built.embed : null;
+        if (!embed) return;
+
+        const components = tray
+            ? built.components
+            : buildPanelRows(resolvedOwner, built.state, session);
+        await msg.edit({ embeds: [embed], components }).catch(() => null);
     } catch (e) {
         logError('Music UI - failed to refresh panel message', e, { guildId });
     }
+}
+
+// Compact "tray player" shown after starting an online track: one big title,
+// a progress bar, time, source, volume and transport buttons.
+function buildTrayPlayerView(guildId, ownerId = null) {
+    const session = getOrCreateVoiceSession(guildId);
+    const state = buildMusicState(session);
+    const title = state.current && state.current.info && state.current.info.title
+        ? state.current.info.title
+        : 'ما فيه شي شغال';
+    const durMs = Number(session.trackDurationMs) || 0;
+    const elapsedMs = getPlaybackProgressMs(session);
+    const active = state.playing || session.paused;
+    const bar = active ? UI.progressBar(elapsedMs, durMs || 1, 20) : null;
+    const progress = durMs
+        ? `${UI.fmtMmSs(elapsedMs)} / ${UI.fmtMmSs(durMs)}`
+        : (active ? `${UI.fmtMmSs(elapsedMs)} / ؟` : '00:00 / 00:00');
+    const status = state.playing ? '▶️ شغّالة الآن' : (session.paused ? '⏸️ موقوفة مؤقتًا' : '⏹️ متوقفة');
+    const source = session.currentTrack && session.currentTrack.source === 'url' ? '🌐 YouTube / أونلاين' : '💾 ملفات محلية';
+    const volPct = Math.round(Math.max(0, Math.min(2, Number(session.volume) || 1)) * 100);
+    const queueLen = Array.isArray(session.queue) ? session.queue.length : 0;
+    const requestedBy = session.currentTrack && session.currentTrack.requestedBy
+        ? `<@${String(session.currentTrack.requestedBy)}>` : '—';
+
+    const embed = UI.embed({
+        title: '🎵 مشغّل الموسيقى',
+        color: UI.COLORS.music,
+        description:
+            `${status}\n\n` +
+            `> **🎶 ${title.slice(0, 256)}**\n\n` +
+            (bar ? `${bar}\n` : '') +
+            `**⏱️ ${progress}**`,
+        fields: [
+            { name: 'المصدر', value: source, inline: true },
+            { name: '🔊 الصوت', value: `**${volPct}%**`, inline: true },
+            { name: '📥 بالقائمة', value: `**${queueLen}**`, inline: true },
+            { name: '🫶 مطلوب بواسطة', value: requestedBy, inline: true },
+            { name: '🔁 التكرار', value: repeatModeLabel(session), inline: true }
+        ],
+        footerText: 'استخدم الأزرار للتحكم • 🎛️ ترجع للوحة الكاملة'
+    });
+
+    const rows = [
+        UI.row(
+            UI.btn('musicctl:stop', '⏹️ إيقاف', { style: ButtonStyle.Danger }),
+            UI.btn('musicctl:pause', '⏸️ توقف مؤقت', { style: ButtonStyle.Secondary }),
+            UI.btn('musicctl:play', '▶️ تشغيل', { style: ButtonStyle.Success }),
+            UI.btn('musicctl:skip', '⏭️ تخطي', { style: ButtonStyle.Secondary })
+        ),
+        UI.row(
+            UI.btn('musicctl:voldown', '🔉 صوت -', { style: ButtonStyle.Secondary }),
+            UI.btn('musicctl:volup', '🔊 صوت +', { style: ButtonStyle.Secondary }),
+            UI.btn('musicctl:repeat', '🔁 التكرار', { style: ButtonStyle.Secondary }),
+            UI.btn('musicctl:queue', '📥 القائمة', { style: ButtonStyle.Secondary }),
+            UI.btn('musicctl:panel', '🎛️ اللوحة', { style: ButtonStyle.Primary })
+        )
+    ];
+
+    return { embed, components: rows, state };
 }
 
 function buildNowPlayingEmbed(guildId) {
@@ -206,6 +269,7 @@ function buildCategoryBrowseView(guildId, ownerId, catKey, page = 0) {
 module.exports = {
     refreshMusicPanelMessage,
     buildNowPlayingEmbed,
+    buildTrayPlayerView,
     getQueueLines,
     buildPanelRows,
     // Alias kept for older call sites

@@ -93,6 +93,8 @@ function createMusicAPI(client) {
             const track = await resolveTrack(query);
             const guildId = interaction.guild.id;
             const session = getOrCreateVoiceSession(guildId);
+            // Switch the existing music panel into the compact tray player.
+            session.viewMode = 'tray';
             const playing = !!(session.player && session.player.state && session.player.state.status && session.player.state.status !== 'idle');
             const entry = {
                 filePath: track.url,
