@@ -855,28 +855,34 @@ function buildNim(ctx) {
 // أسئلة مصممة لإرباك الناس: قواسمة، توافيق، احتمالات، تفاضل وتكامل،
 // مبرهنات نظرية الأعداد... الإجابة الخاطئة تبدو مقنعة عن قصد.
 const MATH_BRUTAL_BANK = [
-    // ── العشرة الأصعب (حساب معياري، مصفوفات، حدود، احتمالات) ──
-    { q: 'ما باقي قسمة 2^100 على 13؟', a: '3', opts: ['3', '1', '4', '7'] },
-    { q: 'ما باقي قسمة 3^50 على 7؟', a: '2', opts: ['2', '1', '3', '4'] },
-    { q: 'كم عدد الأعداد الأولية بين 100 و 200؟', a: '21', opts: ['21', '20', '23', '19'] },
-    { q: 'ما قيمة التكامل من 1 إلى e للدالة ln(x)؟', a: '1', opts: ['1', 'e', '0', 'e-1'] },
-    { q: 'إذا كانت المصفوفة A = [[1,1],[1,0]]، ما قيمة العنصر الأول في الصف الأول من A^5؟', a: '8', opts: ['8', '5', '13', '3'] },
-    { q: 'ما قيمة دالة أويلر φ(2^10)؟', a: '512', opts: ['512', '1024', '256', '1023'] },
-    { q: 'عند رمي نردين، ما احتمال أن يكون حاصل الضرب زوجيًا؟', a: '3/4', opts: ['3/4', '1/2', '1/4', '2/3'] },
-    { q: 'ما قيمة limits (1 - cos x) / x² عندما x → 0؟', a: '1/2', opts: ['1/2', '1', '0', '2'] },
-    { q: 'كم عدد الحلول الحقيقية للمعادلة x⁴ - 5x² + 4 = 0؟', a: '4', opts: ['4', '2', '0', '3'] },
-    { q: 'ما باقي قسمة 7^2026 على 13؟', a: '4', opts: ['4', '3', '7', '6'] },
-    // ── العشرة الأخرى (لا تزال صعبة) ──
-    { q: 'ما باقي قسمة 17! على 19؟', a: '18', opts: ['18', '1', '0', '17'] },
-    { q: 'إذا كان x + 1/x = 3 فما قيمة x² + 1/x²؟', a: '7', opts: ['7', '9', '11', '5'] },
-    { q: 'عند رمي نردين، ما احتمال أن مجموعهما 6؟', a: '5/36', opts: ['5/36', '1/6', '1/12', '1/9'] },
-    { q: 'كم عدد الأعداد الأولية الأقل من 50؟', a: '15', opts: ['15', '14', '16', '13'] },
-    { q: 'ما قيمة دالة أويلر φ(12)؟', a: '4', opts: ['4', '6', '2', '8'] },
-    { q: 'ما مجموع جذور المعادلة 2x² - 8x + 3 = 0؟', a: '4', opts: ['4', '8', '-4', '2'] },
-    { q: 'بكم طريقة يمكن ترتيب حروف كلمة LEVEL؟', a: '30', opts: ['30', '60', '120', '15'] },
-    { q: 'ما القيمة التقريبية للثابت e؟', a: '2.718', opts: ['2.718', '3.141', '1.618', '2.302'] },
-    { q: 'كم عدد المجموعات الجزئية لمجموعة من 7 عناصر؟', a: '128', opts: ['128', '49', '64', '256'] },
-    { q: 'ما قيمة (1+i)²؟', a: '2i', opts: ['2i', '1+2i', '0', '-2i'] }
+    // ── The 10 hardest: modular arithmetic, matrices, integrals, probability ──
+    { q: 'What is the remainder of 2^100 divided by 13?', a: '3', opts: ['3', '1', '4', '7'] },
+    { q: 'What is the remainder of 3^50 divided by 7?', a: '2', opts: ['2', '1', '3', '4'] },
+    { q: 'What is the remainder of 7^2026 divided by 13?', a: '4', opts: ['4', '3', '7', '6'] },
+    { q: 'How many prime numbers are there between 100 and 200?', a: '21', opts: ['21', '20', '23', '19'] },
+    { q: 'Evaluate the integral of ln(x) from 1 to e.', a: '1', opts: ['1', 'e', '0', 'e-1'] },
+    { q: 'If A = [[1,1],[1,0]], what is the top-left entry of A^5?', a: '8', opts: ['8', '5', '13', '3'] },
+    { q: "What is Euler's totient φ(2^10)?", a: '512', opts: ['512', '1024', '256', '1023'] },
+    { q: 'Roll two dice. What is the probability that their product is even?', a: '3/4', opts: ['3/4', '1/2', '1/4', '2/3'] },
+    { q: 'Find lim(x→0) of (1 - cos x) / x².', a: '1/2', opts: ['1/2', '1', '0', '2'] },
+    { q: 'How many real solutions does x⁴ - 5x² + 4 = 0 have?', a: '4', opts: ['4', '2', '0', '3'] },
+    // ── Still hard ──
+    { q: 'What is the remainder of 17! divided by 19?', a: '18', opts: ['18', '1', '0', '17'] },
+    { q: 'If x + 1/x = 3, what is x² + 1/x²?', a: '7', opts: ['7', '9', '11', '5'] },
+    { q: 'Roll two dice. What is the probability that their sum is 6?', a: '5/36', opts: ['5/36', '1/6', '1/12', '1/9'] },
+    { q: 'How many primes are less than 50?', a: '15', opts: ['15', '14', '16', '13'] },
+    { q: "What is Euler's totient φ(12)?", a: '4', opts: ['4', '6', '2', '8'] },
+    { q: 'What is the sum of the roots of 2x² - 8x + 3 = 0?', a: '4', opts: ['4', '8', '-4', '2'] },
+    { q: 'How many distinct arrangements are there of the letters in LEVEL?', a: '30', opts: ['30', '60', '120', '15'] },
+    { q: 'What is the approximate value of e?', a: '2.718', opts: ['2.718', '3.141', '1.618', '2.302'] },
+    { q: 'How many subsets does a set of 7 elements have?', a: '128', opts: ['128', '49', '64', '256'] },
+    { q: 'What is (1+i)²?', a: '2i', opts: ['2i', '1+2i', '0', '-2i'] },
+    // ── Indeterminate-form limits: looks undefined until you actually solve it ──
+    { q: 'Find lim(x→0) of sin(3x) / x. It looks like 0/0 — solve it.', a: '3', opts: ['3', '1', '0', 'undefined'] },
+    { q: 'Find lim(x→∞) of (3x² + 2x - 1) / (5x² - 4). It looks like ∞/∞.', a: '3/5', opts: ['3/5', '3', '5/3', '∞'] },
+    { q: 'Find lim(x→2) of (x² - 4) / (x - 2). It looks like 0/0.', a: '4', opts: ['4', '2', '0', 'undefined'] },
+    { q: 'Find lim(x→0) of (e^x - 1) / x. It looks like 0/0.', a: '1', opts: ['1', '0', 'e', 'undefined'] },
+    { q: 'Find lim(x→∞) of x·(sqrt(x²+1) - x). It looks like ∞·0.', a: '1/2', opts: ['1/2', '1', '0', '∞'] }
 ];
 
 // ---------- مساعدات للألعاب الخارجية (/trivia) ومضاعفات المكافآت ----------
