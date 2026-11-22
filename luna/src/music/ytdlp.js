@@ -42,16 +42,23 @@ async function resolveTrack(query) {
         throw new Error('استجابة yt-dlp غير صالحة 3:');
     }
 
-    const url = info && (info.url || (info.requested_downloads && info.requested_downloads[0] && info.requested_downloads[0].url));
+    // A plain search (ytsearch:) comes back as a playlist-like object whose
+    // first entry is the actual video. A direct URL comes back as the video
+    // itself. Normalise both shapes here.
+    let picked = info;
+    if (picked && Array.isArray(picked.entries) && picked.entries.length) {
+        picked = picked.entries.find((e) => e && e.url) || picked.entries[0];
+    }
+    const url = picked && (picked.url || (picked.requested_downloads && picked.requested_downloads[0] && picked.requested_downloads[0].url));
     if (!url || !/^https?:\/\//i.test(String(url))) {
         throw new Error('ما لقيت رابط تشغيل مباشر للأغنية 3:');
     }
 
     return {
         url: String(url),
-        title: String((info && info.title) || q).slice(0, 200),
-        webpageUrl: String((info && info.webpage_url) || ''),
-        durationMs: Math.max(0, Math.floor(Number(info && info.duration) || 0) * 1000)
+        title: String((picked && picked.title) || q).slice(0, 200),
+        webpageUrl: String((picked && picked.webpage_url) || (info && info.webpage_url) || ''),
+        durationMs: Math.max(0, Math.floor(Number(picked && picked.duration) || 0) * 1000)
     };
 }
 
