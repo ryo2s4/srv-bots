@@ -129,6 +129,9 @@ function buildTrayPlayerView(guildId, ownerId = null) {
             UI.btn('musicctl:repeat', '🔁 التكرار', { style: ButtonStyle.Secondary }),
             UI.btn('musicctl:queue', '📥 القائمة', { style: ButtonStyle.Secondary }),
             UI.btn('musicctl:panel', '🎛️ اللوحة', { style: ButtonStyle.Primary })
+        ),
+        UI.row(
+            UI.btn(`musiconput:${ownerId || '0'}`, '🔗 رابط / اسم أغنية', { style: ButtonStyle.Success })
         )
     ];
 

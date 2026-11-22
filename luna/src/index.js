@@ -4207,8 +4207,21 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // Online music: open a query modal from the music panel.
+        // Online music: switching to the tray player is a separate action from
+        // entering a link. The link input lives inside the tray itself.
         if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musiconline:')) {
+            if (!interaction.guild) return;
+            try { client.music.__getSession(interaction.guild.id).viewMode = 'tray'; } catch { /* ignore */ }
+            await deferUpdateSafe(interaction);
+            await refreshMusicPanelMessage(interaction.guild.id).catch(() => null);
+            try {
+                await interaction.followUp({ content: '🎵 صار هذا مشغّل الموسيقى — اضغط **🔗 رابط / اسم أغنية** عشان تشغّل شي.', flags: MessageFlags.Ephemeral });
+            } catch { /* ignore */ }
+            return;
+        }
+
+        // The link/name input inside the tray player.
+        if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('musiconput:')) {
             if (!interaction.guild) return;
             try {
                 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
