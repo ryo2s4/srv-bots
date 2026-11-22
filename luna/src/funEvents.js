@@ -159,9 +159,12 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
     if (!channel || typeof channel.send !== 'function') return { ok: false, error: 'no event channel' };
 
     // Embeds don't ping on their own — Discord needs explicit allowed_mentions.
-    const allowedMentions = c.roleId
-        ? { parse: [], roles: [String(c.roleId)] }
-        : { parse: [] };
+    // Strip any leftover <@&...> wrapper and validate before sending.
+    const roleId = String(c.roleId == null ? '' : c.roleId)
+        .trim().replace(/^<@&?(!?\d+)>$/, '$1').trim();
+    const validRole = /^\d{15,20}$/.test(roleId) ? roleId : null;
+    const allowedMentions = validRole ? { parse: [], roles: [validRole] } : { parse: [] };
+    const pingContent = validRole ? `<@&${validRole}>` : undefined;
 
     // Gifts are a bonus drop, not a guaranteed reward.
     const chance = Math.max(0, Math.min(100, Number(c.giftChancePct) || 0));
@@ -196,7 +199,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
         );
         state.options = options;
         const msg = await channel.send({
-            content: c.roleId ? `<@&${String(c.roleId)}>` : undefined,
+            content: pingContent,
             embeds: [buildEventEmbed(state)],
             components: [row],
             allowedMentions
@@ -214,7 +217,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
             new ButtonBuilder().setCustomId(`fun:giveaway:${id}:join`).setLabel('🎁 مشاركة').setStyle(ButtonStyle.Success)
         );
         const msg = await channel.send({
-            content: c.roleId ? `<@&${String(c.roleId)}>` : undefined,
+            content: pingContent,
             embeds: [buildEventEmbed(state)],
             components: [row],
             allowedMentions
@@ -243,16 +246,25 @@ async function runRound(guildId, client) {
     const types = ['giveaway'];
     for (let i = 1; i < total; i++) types.push('trivia');
 
+    let started = 0;
+    let lastError = null;
     for (let i = 1; i <= total; i++) {
-        const res = await runEventNow(guildId, client, types[i - 1], i, total).catch(() => ({ ok: false }));
-        if (!res.ok) break;
+        const res = await runEventNow(guildId, client, types[i - 1], i, total)
+            .catch((e) => ({ ok: false, error: e && e.message ? e.message : String(e) }));
+        if (!res.ok) {
+            lastError = res.error || 'could not post event';
+            console.warn(`funEvents: event ${i}/${total} failed: ${lastError}`);
+            break;
+        }
+        started += 1;
         // Wait until someone wins / joins-and-time-ends before continuing.
         await Promise.race([
             res.state.done,
             new Promise((r) => setTimeout(r, Math.max(10_000, res.state.endsAt - Date.now()) + 2000))
         ]);
     }
-    return { ok: true, count: total };
+    if (started === 0) return { ok: false, error: lastError || 'no event channel' };
+    return { ok: true, count: total, started };
 }
 
 async function handleFunButton(interaction) {

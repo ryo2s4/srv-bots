@@ -388,6 +388,10 @@ function normalizeConfig(cfg) {
             ? { ...out.funEvents }
             : { ...base };
         for (const k of ['channelId', 'giveawayChannelId', 'roleId']) {
+            if (typeof f[k] === 'string') {
+                const m = f[k].trim().match(/^<[@#]&?(!?\d+)>$/);
+                if (m) { f[k] = m[1]; changed = true; }
+            }
             if (typeof f[k] !== 'string' && f[k] !== null) { f[k] = null; changed = true; }
         }
         if (typeof f.enabled !== 'boolean') { f.enabled = base.enabled; changed = true; }

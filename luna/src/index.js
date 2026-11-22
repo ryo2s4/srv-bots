@@ -2065,8 +2065,8 @@ client.on('interactionCreate', async interaction => {
             } else if (action === 'run') {
                 const res = await runRoundLocked(interaction.guild.id, client).catch((e) => ({ ok: false, error: e.message }));
                 return replyEphemeral(interaction, { content: res.ok
-                    ? `✅ تم تشغيل ${res.count} فعاليات بالتسلسل (جيف أواي أولًا)`
-                    : `❌ ${res.error || 'جولة شغالة حاليًا'}` });
+                    ? `✅ بدأت ${res.started}/${res.count} فعالية بالتسلسل (جيف أواي أولًا)`
+                    : `❌ ما صار أي حدث: ${res.error || 'تحقق من قنوات الأحداث والصلاحيات'}` });
             } else {
                 const fields = {
                     channel: [['id', 'Channel ID أو <#...>', c.channelId || '']],
@@ -2148,7 +2148,7 @@ client.on('interactionCreate', async interaction => {
         if (interaction.isModalSubmit() && typeof interaction.customId === 'string' && interaction.customId.startsWith('funModal:')) {
             if (!interaction.guild) return;
             const action = interaction.customId.split(':')[1];
-            const cleanId = (v) => String(v || '').trim().replace(/^<[#@&](!?\d+)>$/, '$1').trim();
+            const cleanId = (v) => String(v || '').trim().replace(/^<[@#]&?(!?\d+)>$/, '$1').trim();
             const update = (patch) => updateGuildConfig(interaction.guild.id, (g) => ({ ...g, funEvents: { ...(g.funEvents || {}), ...patch } }));
             if (action === 'channel') update({ channelId: cleanId(interaction.fields.getTextInputValue('id')) || null });
             if (action === 'giveaway') update({ giveawayChannelId: cleanId(interaction.fields.getTextInputValue('id')) || null });
