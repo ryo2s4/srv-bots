@@ -233,14 +233,10 @@ async function runRound(guildId, client) {
     const hi = Math.max(lo, Math.min(5, Number(cfg.maxEvents) || 5));
     const total = lo + Math.floor(Math.random() * (hi - lo + 1));
 
-    // Always include at least one of each event type, then fill the rest
-    // randomly and shuffle so a round is never all giveaways.
-    const types = ['trivia', 'giveaway'];
-    for (let i = 2; i < total; i++) types.push(Math.random() < 0.5 ? 'trivia' : 'giveaway');
-    for (let i = types.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [types[i], types[j]] = [types[j], types[i]];
-    }
+    // Every round starts with exactly one giveaway (in the giveaway channel),
+    // followed by the remaining events as trivia/games in the events channel.
+    const types = ['giveaway'];
+    for (let i = 1; i < total; i++) types.push('trivia');
 
     for (let i = 1; i <= total; i++) {
         const res = await runEventNow(guildId, client, types[i - 1], i, total).catch(() => ({ ok: false }));
