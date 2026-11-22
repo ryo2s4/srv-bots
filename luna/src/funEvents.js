@@ -149,6 +149,11 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
     const channel = channelId ? guild.channels.cache.get(String(channelId)) : null;
     if (!channel || typeof channel.send !== 'function') return { ok: false, error: 'no event channel' };
 
+    // Embeds don't ping on their own — Discord needs explicit allowed_mentions.
+    const allowedMentions = c.roleId
+        ? { parse: [], roles: [String(c.roleId)] }
+        : { parse: [] };
+
     const type = forcedType || (Math.random() < 0.5 ? 'trivia' : 'giveaway');
     const gift = pickWeighted(c.gifts);
     const id = `fun_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -176,7 +181,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
                 .setStyle(i === 0 ? ButtonStyle.Primary : ButtonStyle.Success))
         );
         state.options = options;
-        const msg = await channel.send({ embeds: [buildEventEmbed(state)], components: [row] }).catch(() => null);
+        const msg = await channel.send({ embeds: [buildEventEmbed(state)], components: [row], allowedMentions }).catch(() => null);
         state.messageId = msg && msg.id;
     } else {
         state = {
@@ -189,7 +194,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`fun:giveaway:${id}:join`).setLabel('🎁 مشاركة').setStyle(ButtonStyle.Success)
         );
-        const msg = await channel.send({ embeds: [buildEventEmbed(state)], components: [row] }).catch(() => null);
+        const msg = await channel.send({ embeds: [buildEventEmbed(state)], components: [row], allowedMentions }).catch(() => null);
         state.messageId = msg && msg.id;
     }
 
@@ -209,8 +214,17 @@ async function runRound(guildId, client) {
     const hi = Math.max(lo, Math.min(5, Number(cfg.maxEvents) || 5));
     const total = lo + Math.floor(Math.random() * (hi - lo + 1));
 
+    // Always include at least one of each event type, then fill the rest
+    // randomly and shuffle so a round is never all giveaways.
+    const types = ['trivia', 'giveaway'];
+    for (let i = 2; i < total; i++) types.push(Math.random() < 0.5 ? 'trivia' : 'giveaway');
+    for (let i = types.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [types[i], types[j]] = [types[j], types[i]];
+    }
+
     for (let i = 1; i <= total; i++) {
-        const res = await runEventNow(guildId, client, null, i, total).catch(() => ({ ok: false }));
+        const res = await runEventNow(guildId, client, types[i - 1], i, total).catch(() => ({ ok: false }));
         if (!res.ok) break;
         // Wait until someone wins / joins-and-time-ends before continuing.
         await Promise.race([
