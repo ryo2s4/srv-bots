@@ -30,7 +30,8 @@ function panel(guildId, tag) {
             new ButtonBuilder().setCustomId('funui:prize').setLabel('الجائزة').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('funui:gifts').setLabel('الهدايا والندرة').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('funui:count').setLabel('عدد الفعاليات').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('funui:giftchance').setLabel('احتمال الهدية').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('funui:giftchance').setLabel('احتمال الهدية').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('funui:duration').setLabel('مدة الجيف').setStyle(ButtonStyle.Secondary)
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('funui:toggle').setLabel(c.enabled ? '⛔ إيقاف' : '✅ تفعيل').setStyle(c.enabled ? ButtonStyle.Danger : ButtonStyle.Success),

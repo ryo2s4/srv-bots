@@ -6,6 +6,7 @@ const { getUserInventory, updateUserInventory } = require('./shopStore');
 const { getGuildShop, updateGuildShop } = require('./shopStore');
 const { processXpGain } = require('./levelUpService');
 const { generateRuneDrop } = require('./runes');
+const { getTriviaPool } = require('./eventGames');
 
 const active = new Map(); // eventId -> state
 const roundLocks = new Set(); // guild ids with a round in progress
@@ -171,17 +172,21 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
     let state;
 
     if (type === 'trivia') {
-        const t = TRIVIA[Math.floor(Math.random() * TRIVIA.length)];
-        const correctIdx = Math.floor(Math.random() * 2);
-        const correct = correctIdx === 0 ? t.a[0] : t.wrong[0];
-        const wrong = correctIdx === 0 ? t.wrong[0] : t.a[0];
-        const options = [correct, wrong].sort(() => Math.random() - 0.5);
+        // Reuse the harder /events question banks (general knowledge, English,
+        // riddles) so competitive events are genuinely difficult.
+        const pool = getTriviaPool();
+        const t = pool.length
+            ? pool[Math.floor(Math.random() * pool.length)]
+            : { q: 'كم عدد الكواكب في المجموعة الشمسية؟', correct: '8', opts: ['8', '9', '7', '10'] };
+        const options = Array.isArray(t.opts) && t.opts.length >= 2
+            ? t.opts.slice(0, 4)
+            : [t.correct, 'إجابة أخرى'];
         state = {
             id, guildId: String(guildId), type: 'trivia', channel,
             roundIndex, roundTotal, done, _resolveDone: resolveDone,
             messageId: null, prize: Number(c.prizePoints) || 100, gift,
-            description: `${t.q}\n\nأول إجابة صحيحة تفوز!`,
-            correct, entrants: new Set(), finished: false, endsAt: Date.now() + 90_000
+            description: `${t.q}\n\n🧠 **تحدٍ صعب** — أول إجابة صحيحة تفوز!`,
+            correct: t.correct, entrants: new Set(), finished: false, endsAt: Date.now() + 90_000
         };
         const row = new ActionRowBuilder().addComponents(
             ...options.map((opt, i) => new ButtonBuilder()
@@ -280,6 +285,19 @@ async function handleFunButton(interaction) {
     return true;
 }
 
+// Single entry point for both the scheduler and the manual "run now" button.
+// The lock stops a second round from starting while one is still in progress.
+async function runRoundLocked(guildId, client) {
+    const key = String(guildId);
+    if (roundLocks.has(key)) return { ok: false, error: 'round already running' };
+    roundLocks.add(key);
+    try {
+        return await runRound(guildId, client);
+    } finally {
+        roundLocks.delete(key);
+    }
+}
+
 function startFunScheduler(client) {
     if (schedulerStarted) return;
     schedulerStarted = true;
@@ -293,9 +311,7 @@ function startFunScheduler(client) {
             const iv = Math.max(1, Number(c.intervalHours) || 24) * 3600_000;
             const jitter = 0.8 + Math.random() * 0.4;
             updateGuildConfig(gid, (g) => ({ ...g, funEvents: { ...c, nextAt: now + Math.floor(iv * jitter) } }));
-            roundLocks.add(gid);
-            try { await runRound(gid, client); } catch { /* ignore */ }
-            finally { roundLocks.delete(gid); }
+            try { await runRoundLocked(gid, client); } catch { /* ignore */ }
         }
     }, 60_000);
 }
@@ -305,4 +321,4 @@ function getAllGuildConfigsSafe() {
     try { return require('./guildConfig').getAllGuildConfigs(); } catch { return {}; }
 }
 
-module.exports = { startFunScheduler, runEventNow, runRound, handleFunButton, GIFT_TYPES };
+module.exports = { startFunScheduler, runEventNow, runRound, runRoundLocked, handleFunButton, GIFT_TYPES };

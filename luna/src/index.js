@@ -62,7 +62,7 @@ const { getGuildConfig, updateGuildConfig, emojiKeyFromReaction, emojiKeyFromStr
 const { getUserStats, updateUserStats, getGuildUsers, getLunaPoints, addLunaPoints, spendLunaPoints, transferLunaPoints } = require('./levelsStore');
 const { getGuildShop, updateGuildShop, getAllGuildShops, getUserInventory, updateUserInventory } = require('./shopStore');
 const { createScheduler } = require('./scheduler');
-const { startFunScheduler, runEventNow, runRound, handleFunButton } = require('./funEvents');
+const { startFunScheduler, runEventNow, runRound, runRoundLocked, handleFunButton } = require('./funEvents');
 const { THEME } = require('./utils/theme');
 const UI = require('./utils/ui');
 const { logError } = require('./utils/log');
@@ -2063,8 +2063,10 @@ client.on('interactionCreate', async interaction => {
                     ...g, funEvents: { ...(g.funEvents || {}), enabled: !c.enabled, nextAt: 0 }
                 }));
             } else if (action === 'run') {
-                const res = await runRound(interaction.guild.id, client).catch((e) => ({ ok: false, error: e.message }));
-                return replyEphemeral(interaction, { content: res.ok ? `✅ تم تشغيل ${res.count} فعاليات بالتسلسل` : `❌ ${res.error}` });
+                const res = await runRoundLocked(interaction.guild.id, client).catch((e) => ({ ok: false, error: e.message }));
+                return replyEphemeral(interaction, { content: res.ok
+                    ? `✅ تم تشغيل ${res.count} فعاليات بالتسلسل (جيف أواي أولًا)`
+                    : `❌ ${res.error || 'جولة شغالة حاليًا'}` });
             } else {
                 const fields = {
                     channel: [['id', 'Channel ID أو <#...>', c.channelId || '']],
@@ -2073,6 +2075,7 @@ client.on('interactionCreate', async interaction => {
                     interval: [['hours', 'كم ساعة بين حدث وثاني؟', String(c.intervalHours || 24)]],
                     prize: [['points', 'Luna Points للفائز (دائمًا)', String(c.prizePoints || 100)]],
                     giftchance: [['percent', 'احتمال نزول هدية إضافية %', String(c.giftChancePct == null ? 30 : c.giftChancePct)]],
+                    duration: [['minutes', 'مدة الجيف أواي بالدقائق (1-1440)', String(c.giveawayMinutes || 5)]],
                     gifts: [['gifts', 'الهدايا (سطر لكل هدية: الاسم|الندرة|نقاط)', (c.gifts || []).map((g) => `${g.name}|${g.rarity || 'common'}|${g.points || 0}`).join('\n').slice(0, 1000)]]
                 };
                 if (action === 'gifts') {
@@ -2157,6 +2160,7 @@ client.on('interactionCreate', async interaction => {
             }
             if (action === 'prize') update({ prizePoints: Math.max(0, Number(interaction.fields.getTextInputValue('points')) || 0) });
             if (action === 'giftchance') update({ giftChancePct: Math.max(0, Math.min(100, Number(interaction.fields.getTextInputValue('percent')) || 0)) });
+            if (action === 'duration') update({ giveawayMinutes: Math.max(1, Math.min(1440, Number(interaction.fields.getTextInputValue('minutes')) || 5)) });
             const p = require('./commands/fun').panel(interaction.guild.id, interaction.user.tag);
             try { await interaction.reply({ embeds: [p.embed], components: p.components, flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
             return;
