@@ -62,7 +62,7 @@ const { getGuildConfig, updateGuildConfig, emojiKeyFromReaction, emojiKeyFromStr
 const { getUserStats, updateUserStats, getGuildUsers, getLunaPoints, addLunaPoints, spendLunaPoints, transferLunaPoints } = require('./levelsStore');
 const { getGuildShop, updateGuildShop, getAllGuildShops, getUserInventory, updateUserInventory } = require('./shopStore');
 const { createScheduler } = require('./scheduler');
-const { startFunScheduler, runEventNow, handleFunButton } = require('./funEvents');
+const { startFunScheduler, runEventNow, runRound, handleFunButton } = require('./funEvents');
 const { THEME } = require('./utils/theme');
 const UI = require('./utils/ui');
 const { logError } = require('./utils/log');
@@ -2063,8 +2063,8 @@ client.on('interactionCreate', async interaction => {
                     ...g, funEvents: { ...(g.funEvents || {}), enabled: !c.enabled, nextAt: 0 }
                 }));
             } else if (action === 'run') {
-                const res = await runEventNow(interaction.guild.id, client).catch((e) => ({ ok: false, error: e.message }));
-                return replyEphemeral(interaction, { content: res.ok ? `✅ تم تشغيل حدث ${res.type}` : `❌ ${res.error}` });
+                const res = await runRound(interaction.guild.id, client).catch((e) => ({ ok: false, error: e.message }));
+                return replyEphemeral(interaction, { content: res.ok ? `✅ تم تشغيل ${res.count} فعاليات بالتسلسل` : `❌ ${res.error}` });
             } else {
                 const fields = {
                     channel: [['id', 'Channel ID أو <#...>', c.channelId || '']],
@@ -2075,6 +2075,20 @@ client.on('interactionCreate', async interaction => {
                     gifts: [['gifts', 'الهدايا (سطر لكل هدية: الاسم|الندرة|نقاط)', (c.gifts || []).map((g) => `${g.name}|${g.rarity || 'common'}|${g.points || 0}`).join('\n').slice(0, 1000)]]
                 };
                 const f = fields[action];
+                if (action === 'count') {
+                    const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+                    const modal = new ModalBuilder().setCustomId('funModal:count').setTitle('عدد الفعاليات في الجولة');
+                    modal.addComponents(
+                        new ActionRowBuilder().addComponents(
+                            new TextInputBuilder().setCustomId('min').setLabel('الأقل (2-5)').setStyle(TextInputStyle.Short).setRequired(false).setValue(String(c.minEvents || 2))
+                        ),
+                        new ActionRowBuilder().addComponents(
+                            new TextInputBuilder().setCustomId('max').setLabel('الأكثر (2-5)').setStyle(TextInputStyle.Short).setRequired(false).setValue(String(c.maxEvents || 5))
+                        )
+                    );
+                    try { await interaction.showModal(modal); } catch { /* ignore */ }
+                    return;
+                }
                 if (f) {
                     const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
                     const modal = new ModalBuilder().setCustomId(`funModal:${action}`).setTitle('إعداد أحداث الفن');
@@ -2099,6 +2113,11 @@ client.on('interactionCreate', async interaction => {
             if (action === 'giveaway') update({ giveawayChannelId: cleanId(interaction.fields.getTextInputValue('id')) || null });
             if (action === 'role') update({ roleId: cleanId(interaction.fields.getTextInputValue('id')) || null });
             if (action === 'interval') update({ intervalHours: Math.max(1, Number(interaction.fields.getTextInputValue('hours')) || 24), nextAt: 0 });
+            if (action === 'count') {
+                const lo = Math.max(2, Math.min(5, Number(interaction.fields.getTextInputValue('min')) || 2));
+                const hi = Math.max(lo, Math.min(5, Number(interaction.fields.getTextInputValue('max')) || 5));
+                update({ minEvents: lo, maxEvents: hi });
+            }
             if (action === 'prize') update({ prizePoints: Math.max(0, Number(interaction.fields.getTextInputValue('points')) || 0) });
             if (action === 'gifts') {
                 const gifts = String(interaction.fields.getTextInputValue('gifts') || '')

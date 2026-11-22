@@ -12,6 +12,7 @@ function panel(guildId, tag) {
             `**قناة الجيف أواي:** ${c.giveawayChannelId ? `<#${c.giveawayChannelId}>` : '—'}\n` +
             `**الرتبة المستهدفة:** ${c.roleId ? `<@&${c.roleId}>` : '—'}\n` +
             `**التكرار:** كل ${c.intervalHours || 24} ساعة\n` +
+            `**فعاليات كل جولة:** ${c.minEvents || 2} - ${c.maxEvents || 5}\n` +
             `**الجائزة:** ${c.prizePoints || 100} Luna Points\n` +
             `**مدة الجيف أواي:** ${c.giveawayMinutes || 5} دقائق\n` +
             `**الهدايا:** ${(c.gifts || []).length}`
@@ -26,7 +27,8 @@ function panel(guildId, tag) {
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('funui:interval').setLabel('التكرار').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId('funui:prize').setLabel('الجائزة').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('funui:gifts').setLabel('الهدايا والندرة').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('funui:gifts').setLabel('الهدايا والندرة').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('funui:count').setLabel('عدد الفعاليات').setStyle(ButtonStyle.Secondary)
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('funui:toggle').setLabel(c.enabled ? '⛔ إيقاف' : '✅ تفعيل').setStyle(c.enabled ? ButtonStyle.Danger : ButtonStyle.Success),

@@ -4,6 +4,7 @@ const { getGuildConfig, updateGuildConfig } = require('./guildConfig');
 const { addLunaPoints } = require('./levelsStore');
 
 const active = new Map(); // eventId -> state
+const roundLocks = new Set(); // guild ids with a round in progress
 let schedulerStarted = false;
 
 const TRIVIA = [
@@ -30,7 +31,11 @@ function buildEventEmbed(state) {
         .setColor('#B28DDE')
         .setTitle(state.type === 'giveaway' ? '🎉 جيف أواي!' : '🧠 تحدّي لونا')
         .setDescription(state.description)
-        .setFooter({ text: 'أول من يضغط الإجابة الصحيحة يفوز' })
+        .setFooter({
+            text: state.roundTotal
+                ? `الفعالية ${state.roundIndex}/${state.roundTotal} • ${state.type === 'giveaway' ? 'اضغط مشاركة' : 'أول إجابة صحيحة تفوز'}`
+                : (state.type === 'giveaway' ? 'اضغط مشاركة' : 'أول إجابة صحيحة تفوز')
+        })
         .setTimestamp();
     if (state.gift) e.addFields({ name: '🎁 الهدية', value: `${state.gift.name} (${state.gift.rarity || 'common'})`, inline: false });
     if (state.type === 'giveaway') e.addFields({ name: '👥 المشاركون', value: String(state.entrants.size), inline: true });
@@ -46,6 +51,7 @@ async function finish(state, winnerId) {
     if (!state || state.finished) return;
     state.finished = true;
     active.delete(state.id);
+    if (typeof state._resolveDone === 'function') state._resolveDone();
     try {
         let desc = winnerId
             ? `🏆 الفائز: <@${winnerId}> — حصل على **${await award(state.guildId, winnerId, state)}**`
@@ -67,7 +73,7 @@ async function finish(state, winnerId) {
     } catch { /* ignore */ }
 }
 
-async function runEventNow(guildId, client, forcedType = null) {
+async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, roundTotal = 0) {
     const cfg = getGuildConfig(guildId);
     const c = cfg.funEvents || {};
     const guild = client.guilds.cache.get(String(guildId));
@@ -79,6 +85,8 @@ async function runEventNow(guildId, client, forcedType = null) {
     const type = forcedType || (Math.random() < 0.5 ? 'trivia' : 'giveaway');
     const gift = pickWeighted(c.gifts);
     const id = `fun_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    let resolveDone;
+    const done = new Promise((r) => { resolveDone = r; });
     let state;
 
     if (type === 'trivia') {
@@ -89,6 +97,7 @@ async function runEventNow(guildId, client, forcedType = null) {
         const options = [correct, wrong].sort(() => Math.random() - 0.5);
         state = {
             id, guildId: String(guildId), type: 'trivia', channel,
+            roundIndex, roundTotal, done, _resolveDone: resolveDone,
             messageId: null, prize: Number(c.prizePoints) || 100, gift,
             description: `${c.roleId ? `<@&${c.roleId}> ` : ''}${t.q}\n\nأول إجابة صحيحة تفوز!`,
             correct, entrants: new Set(), finished: false, endsAt: Date.now() + 90_000
@@ -105,6 +114,7 @@ async function runEventNow(guildId, client, forcedType = null) {
     } else {
         state = {
             id, guildId: String(guildId), type: 'giveaway', channel,
+            roundIndex, roundTotal, done, _resolveDone: resolveDone,
             messageId: null, prize: Number(c.prizePoints) || 100, gift,
             description: `${c.roleId ? `<@&${c.roleId}> ` : ''}جيف أواي جديد! اضغط المشاركة قبل انتهاء الوقت.`,
             entrants: new Set(), finished: false, endsAt: Date.now() + Math.max(1, Number(c.giveawayMinutes) || 5) * 60_000
@@ -121,7 +131,27 @@ async function runEventNow(guildId, client, forcedType = null) {
     setTimeout(() => finish(state, state.type === 'giveaway'
         ? [...state.entrants][Math.floor(Math.random() * state.entrants.size)]
         : null), Math.max(5_000, state.endsAt - Date.now()));
-    return { ok: true, type, id };
+    return { ok: true, type, id, state };
+}
+
+// One trigger = a round of several events, played one after another. Each
+// event waits for a winner or its timer before the next one starts.
+async function runRound(guildId, client) {
+    const cfg = getGuildConfig(guildId).funEvents || {};
+    const lo = Math.max(1, Math.min(5, Number(cfg.minEvents) || 2));
+    const hi = Math.max(lo, Math.min(5, Number(cfg.maxEvents) || 5));
+    const total = lo + Math.floor(Math.random() * (hi - lo + 1));
+
+    for (let i = 1; i <= total; i++) {
+        const res = await runEventNow(guildId, client, null, i, total).catch(() => ({ ok: false }));
+        if (!res.ok) break;
+        // Wait until someone wins / joins-and-time-ends before continuing.
+        await Promise.race([
+            res.state.done,
+            new Promise((r) => setTimeout(r, Math.max(10_000, res.state.endsAt - Date.now()) + 2000))
+        ]);
+    }
+    return { ok: true, count: total };
 }
 
 async function handleFunButton(interaction) {
@@ -162,11 +192,14 @@ function startFunScheduler(client) {
         for (const [gid, cfg] of Object.entries(getGuildConfig ? getAllGuildConfigsSafe() : {})) {
             const c = cfg && cfg.funEvents;
             if (!c || !c.enabled || !c.channelId) continue;
+            if (roundLocks.has(gid)) continue;
             if (c.nextAt && now < c.nextAt) continue;
             const iv = Math.max(1, Number(c.intervalHours) || 24) * 3600_000;
             const jitter = 0.8 + Math.random() * 0.4;
             updateGuildConfig(gid, (g) => ({ ...g, funEvents: { ...c, nextAt: now + Math.floor(iv * jitter) } }));
-            await runEventNow(gid, client).catch(() => null);
+            roundLocks.add(gid);
+            try { await runRound(gid, client); } catch { /* ignore */ }
+            finally { roundLocks.delete(gid); }
         }
     }, 60_000);
 }
@@ -176,4 +209,4 @@ function getAllGuildConfigsSafe() {
     try { return require('./guildConfig').getAllGuildConfigs(); } catch { return {}; }
 }
 
-module.exports = { startFunScheduler, runEventNow, handleFunButton };
+module.exports = { startFunScheduler, runEventNow, runRound, handleFunButton };

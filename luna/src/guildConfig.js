@@ -97,6 +97,8 @@ function defaultGuildConfig() {
             giveawayChannelId: null,
             roleId: null,
             intervalHours: 24,
+            minEvents: 2,
+            maxEvents: 5,
             nextAt: 0,
             prizePoints: 100,
             giveawayMinutes: 5,
@@ -388,6 +390,8 @@ function normalizeConfig(cfg) {
         }
         if (typeof f.enabled !== 'boolean') { f.enabled = base.enabled; changed = true; }
         if (typeof f.intervalHours !== 'number' || Number.isNaN(f.intervalHours)) { f.intervalHours = base.intervalHours; changed = true; }
+        if (typeof f.minEvents !== 'number' || Number.isNaN(f.minEvents)) { f.minEvents = base.minEvents; changed = true; }
+        if (typeof f.maxEvents !== 'number' || Number.isNaN(f.maxEvents)) { f.maxEvents = base.maxEvents; changed = true; }
         if (typeof f.nextAt !== 'number' || Number.isNaN(f.nextAt)) { f.nextAt = 0; changed = true; }
         if (typeof f.prizePoints !== 'number' || Number.isNaN(f.prizePoints)) { f.prizePoints = base.prizePoints; changed = true; }
         if (typeof f.giveawayMinutes !== 'number' || Number.isNaN(f.giveawayMinutes)) { f.giveawayMinutes = base.giveawayMinutes; changed = true; }
