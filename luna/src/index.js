@@ -62,6 +62,7 @@ const { getGuildConfig, updateGuildConfig, emojiKeyFromReaction, emojiKeyFromStr
 const { getUserStats, updateUserStats, getGuildUsers, getLunaPoints, addLunaPoints, spendLunaPoints, transferLunaPoints } = require('./levelsStore');
 const { getGuildShop, updateGuildShop, getAllGuildShops, getUserInventory, updateUserInventory } = require('./shopStore');
 const { createScheduler } = require('./scheduler');
+const { startFunScheduler, runEventNow, handleFunButton } = require('./funEvents');
 const { THEME } = require('./utils/theme');
 const UI = require('./utils/ui');
 const { logError } = require('./utils/log');
@@ -1318,6 +1319,7 @@ client.once('clientReady', async () => {
                 }
             }
             console.log(`Successfully registered global slash commands (cleared ${guilds.length} guilds).`);
+            startFunScheduler(client);
         }
     } catch (error) {
         console.error('Failed to register slash commands:', error.message);
@@ -2042,6 +2044,73 @@ client.on('interactionCreate', async interaction => {
             } catch {
                 // ignore
             }
+            return;
+        }
+
+        // V11.6 fun events: game buttons.
+        if (await handleFunButton(interaction)) return;
+
+        // V11.6 fun events: admin panel.
+        if (interaction.isButton() && typeof interaction.customId === 'string' && interaction.customId.startsWith('funui:')) {
+            if (!interaction.guild) return;
+            if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionFlagsBits.ManageGuild)) {
+                return replyEphemeral(interaction, { content: 'تحتاج Manage Server 3:' });
+            }
+            const action = interaction.customId.split(':')[1];
+            const c = getGuildConfig(interaction.guild.id).funEvents || {};
+            if (action === 'toggle') {
+                updateGuildConfig(interaction.guild.id, (g) => ({
+                    ...g, funEvents: { ...(g.funEvents || {}), enabled: !c.enabled, nextAt: 0 }
+                }));
+            } else if (action === 'run') {
+                const res = await runEventNow(interaction.guild.id, client).catch((e) => ({ ok: false, error: e.message }));
+                return replyEphemeral(interaction, { content: res.ok ? `✅ تم تشغيل حدث ${res.type}` : `❌ ${res.error}` });
+            } else {
+                const fields = {
+                    channel: [['id', 'Channel ID أو <#...>', c.channelId || '']],
+                    giveaway: [['id', 'Channel ID أو <#...>', c.giveawayChannelId || '']],
+                    role: [['id', 'Role ID أو <@&...>', c.roleId || '']],
+                    interval: [['hours', 'كم ساعة بين حدث وثاني؟', String(c.intervalHours || 24)]],
+                    prize: [['points', 'Luna Points للفائز', String(c.prizePoints || 100)]],
+                    gifts: [['gifts', 'الهدايا (سطر لكل هدية: الاسم|الندرة|نقاط)', (c.gifts || []).map((g) => `${g.name}|${g.rarity || 'common'}|${g.points || 0}`).join('\n').slice(0, 1000)]]
+                };
+                const f = fields[action];
+                if (f) {
+                    const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+                    const modal = new ModalBuilder().setCustomId(`funModal:${action}`).setTitle('إعداد أحداث الفن');
+                    modal.addComponents(new ActionRowBuilder().addComponents(
+                        new TextInputBuilder().setCustomId(f[0][0]).setLabel(f[0][1]).setStyle(f[0][0] === 'gifts' ? TextInputStyle.Paragraph : TextInputStyle.Short).setRequired(false).setValue(f[0][2])
+                    ));
+                    try { await interaction.showModal(modal); } catch { /* ignore */ }
+                    return;
+                }
+            }
+            const p = require('./commands/fun').panel(interaction.guild.id, interaction.user.tag);
+            try { await interaction.update({ embeds: [p.embed], components: p.components }); } catch { /* ignore */ }
+            return;
+        }
+
+        if (interaction.isModalSubmit() && typeof interaction.customId === 'string' && interaction.customId.startsWith('funModal:')) {
+            if (!interaction.guild) return;
+            const action = interaction.customId.split(':')[1];
+            const cleanId = (v) => String(v || '').trim().replace(/^<[#@&](!?\d+)>$/, '$1').trim();
+            const update = (patch) => updateGuildConfig(interaction.guild.id, (g) => ({ ...g, funEvents: { ...(g.funEvents || {}), ...patch } }));
+            if (action === 'channel') update({ channelId: cleanId(interaction.fields.getTextInputValue('id')) || null });
+            if (action === 'giveaway') update({ giveawayChannelId: cleanId(interaction.fields.getTextInputValue('id')) || null });
+            if (action === 'role') update({ roleId: cleanId(interaction.fields.getTextInputValue('id')) || null });
+            if (action === 'interval') update({ intervalHours: Math.max(1, Number(interaction.fields.getTextInputValue('hours')) || 24), nextAt: 0 });
+            if (action === 'prize') update({ prizePoints: Math.max(0, Number(interaction.fields.getTextInputValue('points')) || 0) });
+            if (action === 'gifts') {
+                const gifts = String(interaction.fields.getTextInputValue('gifts') || '')
+                    .split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 25)
+                    .map((l) => {
+                        const [name, rarity, points] = l.split('|').map((s) => String(s || '').trim());
+                        return name ? { name: name.slice(0, 80), rarity: (rarity || 'common').slice(0, 20), points: Math.max(0, Number(points) || 0) } : null;
+                    }).filter(Boolean);
+                update({ gifts });
+            }
+            const p = require('./commands/fun').panel(interaction.guild.id, interaction.user.tag);
+            try { await interaction.reply({ embeds: [p.embed], components: p.components, flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
             return;
         }
 
@@ -5738,6 +5807,14 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ content: 'ما فيه خيارات لهذا الزر.', ephemeral: true });
             }
 
+            // Simple buttons (one popup, one response) reply directly.
+            if (options.length === 1) {
+                return interaction.reply({
+                    content: String(options[0].response || '').slice(0, 1900) || '—',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
             const menu = new StringSelectMenuBuilder()
                 .setCustomId(`forumPostSel:${postId}:${btnIdx}`)
                 .setPlaceholder('اختار من القائمة')
@@ -6782,6 +6859,39 @@ client.on('interactionCreate', async interaction => {
                 }
             }
 
+            if (action === 'random') {
+                const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+                const cfgR = getGuildConfig(interaction.guild.id);
+                const rr = cfgR.randomReply || {};
+                const modal = new ModalBuilder()
+                    .setCustomId('repliesModal:random')
+                    .setTitle('رد عشوائي نادر');
+                modal.addComponents(
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder().setCustomId('channelId').setLabel('Channel ID (أو none)')
+                            .setStyle(TextInputStyle.Short).setRequired(false)
+                            .setValue(rr.channelId || '')
+                    ),
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder().setCustomId('chance').setLabel('الاحتمال % (مثال: 1)')
+                            .setStyle(TextInputStyle.Short).setRequired(false)
+                            .setValue(String(rr.chancePct == null ? 1 : rr.chancePct))
+                    ),
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder().setCustomId('texts').setLabel('النصوص (كل نص بسطر)')
+                            .setStyle(TextInputStyle.Paragraph).setRequired(false)
+                            .setValue((Array.isArray(rr.texts) ? rr.texts : []).join('\n').slice(0, 1000))
+                    ),
+                    new ActionRowBuilder().addComponents(
+                        new TextInputBuilder().setCustomId('enabled').setLabel('تفعيل؟ (yes / no)')
+                            .setStyle(TextInputStyle.Short).setRequired(false)
+                            .setValue(rr.enabled ? 'yes' : 'no')
+                    )
+                );
+                try { await interaction.showModal(modal); } catch { /* ignore */ }
+                return;
+            }
+
             if (action === 'chanlist') {
                 const cfgCh = getGuildConfig(interaction.guild.id);
                 const chans = Array.isArray(cfgCh.channelAutoReplies) ? cfgCh.channelAutoReplies : [];
@@ -7125,6 +7235,36 @@ client.on('interactionCreate', async interaction => {
             const parts = interaction.customId.split(':');
             const modalType = parts[1];
             const prevTrigger = parts[2] ? decodeURIComponent(parts[2]) : null;
+
+            if (modalType === 'random') {
+                const rawChannel = String(interaction.fields.getTextInputValue('channelId') || '').trim();
+                const channelId = (!rawChannel || rawChannel.toLowerCase() === 'none')
+                    ? null
+                    : (rawChannel.replace(/^<#(\d+)>$/, '$1').trim());
+                if (channelId && !/^\d{15,20}$/.test(channelId)) {
+                    return interaction.reply({ content: 'ايدي الروم غير صحيح 3:', flags: MessageFlags.Ephemeral });
+                }
+                const chance = Math.max(0, Math.min(100, Number(interaction.fields.getTextInputValue('chance')) || 0));
+                const texts = String(interaction.fields.getTextInputValue('texts') || '')
+                    .split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 25);
+                const enabledRaw = String(interaction.fields.getTextInputValue('enabled') || '').trim().toLowerCase();
+                const enabled = enabledRaw === 'yes' || enabledRaw === 'true' || enabledRaw === '1';
+                updateGuildConfig(interaction.guild.id, (c) => ({
+                    ...c,
+                    randomReply: {
+                        enabled: enabled && !!channelId && texts.length > 0,
+                        channelId,
+                        chancePct: chance,
+                        texts
+                    }
+                }));
+                return interaction.reply({
+                    content: enabled && channelId && texts.length
+                        ? `✅ رد عشوائي مفعّل في <#${channelId}> باحتمال **${chance}%**`
+                        : '✅ تم الحفظ (لكنه معطّل — لازم روم ونصوص وتفعيل)',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
 
             if (modalType === 'channel') {
                 const channelIdRaw = String(interaction.fields.getTextInputValue('channelId') || '').trim();
@@ -9230,6 +9370,22 @@ client.on('messageCreate', async message => {
                 claimedAt: entry && entry.claimedAt ? entry.claimedAt : 0,
                 updatedAt: Date.now()
             });
+        }
+    } catch {
+        // ignore
+    }
+
+    // Super-rare spontaneous reply in a chosen channel (V11.6).
+    try {
+        const rr = config.randomReply;
+        if (rr && rr.enabled === true && rr.channelId === message.channel.id && !message.author.bot) {
+            const texts = Array.isArray(rr.texts) ? rr.texts.filter((t) => typeof t === 'string' && t.trim()) : [];
+            const chance = Math.max(0, Math.min(100, Number(rr.chancePct) || 0));
+            if (texts.length && Math.random() * 100 < chance) {
+                const pick = texts[Math.floor(Math.random() * texts.length)];
+                await message.reply(String(pick).slice(0, 1900)).catch(() => null);
+                return;
+            }
         }
     } catch {
         // ignore

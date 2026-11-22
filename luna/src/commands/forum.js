@@ -50,7 +50,7 @@ function buildForumUiRows(ownerId, postId) {
     return [
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`forumui:edit_embed:${ownerId}:${postId}`).setLabel('تعديل الإيمبد').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`forumui:add_button:${ownerId}:${postId}`).setLabel('إضافة زر').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`forumui:add_simple:${ownerId}:${postId}`).setLabel('إضافة زر').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`forumui:clear_buttons:${ownerId}:${postId}`).setLabel('مسح الأزرار').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`forumui:templates:${ownerId}:${postId}`).setLabel('قوالب جاهزة').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`forumui:preview:${ownerId}:${postId}`).setLabel('معاينة').setStyle(ButtonStyle.Secondary)

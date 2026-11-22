@@ -90,6 +90,25 @@ function defaultGuildConfig() {
         channelAutoReplies: [],
         // Channels where *any* message gets the author banned (honeypot)
         honeypotChannelIds: [],
+        // Daily random events + giveaways (V11.6)
+        funEvents: {
+            enabled: false,
+            channelId: null,
+            giveawayChannelId: null,
+            roleId: null,
+            intervalHours: 24,
+            nextAt: 0,
+            prizePoints: 100,
+            giveawayMinutes: 5,
+            gifts: []
+        },
+        // Very rare spontaneous replies from Luna in one channel
+        randomReply: {
+            enabled: false,
+            channelId: null,
+            chancePct: 1,
+            texts: []
+        },
         // Channel where the public /mechanics panel lives (null = reply in place)
         mechanicsChannelId: null,
         rgbRole: {
@@ -358,6 +377,35 @@ function normalizeConfig(cfg) {
 
     if (!Array.isArray(out.honeypotChannelIds)) { out.honeypotChannelIds = []; changed = true; }
     if (typeof out.mechanicsChannelId !== 'string' && out.mechanicsChannelId !== null) { out.mechanicsChannelId = null; changed = true; }
+
+    {
+        const base = defaultGuildConfig().funEvents;
+        const f = out.funEvents && typeof out.funEvents === 'object' && !Array.isArray(out.funEvents)
+            ? { ...out.funEvents }
+            : { ...base };
+        for (const k of ['channelId', 'giveawayChannelId', 'roleId']) {
+            if (typeof f[k] !== 'string' && f[k] !== null) { f[k] = null; changed = true; }
+        }
+        if (typeof f.enabled !== 'boolean') { f.enabled = base.enabled; changed = true; }
+        if (typeof f.intervalHours !== 'number' || Number.isNaN(f.intervalHours)) { f.intervalHours = base.intervalHours; changed = true; }
+        if (typeof f.nextAt !== 'number' || Number.isNaN(f.nextAt)) { f.nextAt = 0; changed = true; }
+        if (typeof f.prizePoints !== 'number' || Number.isNaN(f.prizePoints)) { f.prizePoints = base.prizePoints; changed = true; }
+        if (typeof f.giveawayMinutes !== 'number' || Number.isNaN(f.giveawayMinutes)) { f.giveawayMinutes = base.giveawayMinutes; changed = true; }
+        if (!Array.isArray(f.gifts)) { f.gifts = []; changed = true; }
+        out.funEvents = f;
+    }
+
+    {
+        const base = defaultGuildConfig().randomReply;
+        const r = out.randomReply && typeof out.randomReply === 'object' && !Array.isArray(out.randomReply)
+            ? { ...out.randomReply }
+            : { ...base };
+        if (typeof r.enabled !== 'boolean') { r.enabled = base.enabled; changed = true; }
+        if (typeof r.channelId !== 'string' && r.channelId !== null) { r.channelId = null; changed = true; }
+        if (typeof r.chancePct !== 'number' || Number.isNaN(r.chancePct)) { r.chancePct = base.chancePct; changed = true; }
+        if (!Array.isArray(r.texts)) { r.texts = []; changed = true; }
+        out.randomReply = r;
+    }
 
     // Fold the legacy single channel auto-reply into the list (once).
     const legacyCar = out.channelAutoReply;

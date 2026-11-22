@@ -231,6 +231,50 @@ async function handleForumUiButtons({ client, interaction }) {
         }
     }
 
+    // Simplified builder: one popup per button — name, colour, content.
+    if (action === 'add_simple') {
+        const modal = new ModalBuilder()
+            .setCustomId(`forumuiModal:add_simple:${ownerId}:${postId}`)
+            .setTitle('إضافة زر');
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('label')
+                    .setLabel('اسم الزر')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setMaxLength(80)
+                    .setPlaceholder('مثال: القوانين')
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('style')
+                    .setLabel('اللون: ازرق / اخضر / احمر / رمادي')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(false)
+                    .setMaxLength(20)
+                    .setValue('رمادي')
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('response')
+                    .setLabel('شو يظهر لما العضو يضغط؟')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(true)
+                    .setMaxLength(3500)
+                    .setPlaceholder('اكتب النص اللي بيظهر للعضو...')
+            )
+        );
+
+        try {
+            await interaction.showModal(modal);
+        } catch {
+            await replyEphemeral(interaction, { content: 'اسفة بس ما قدرت أفتح الفورم 3:' });
+        }
+        return true;
+    }
+
     if (action === 'add_button') {
         const modal = new ModalBuilder()
             .setCustomId(`forumuiModal:add_button:${ownerId}:${postId}`)
@@ -612,6 +656,29 @@ async function handleForumUiModal({ client, interaction }) {
         const embed = forumCmd.buildDraftPreviewEmbed(next, interaction.user.tag);
         const components = forumCmd.buildForumUiRows(interaction.user.id, postId);
         await replyEphemeral(interaction, { content: '✅ تم تحديث المسودة.', embeds: [embed], components });
+        return true;
+    }
+
+    if (kind === 'add_simple') {
+        const label = String(interaction.fields.getTextInputValue('label') || '').trim();
+        const style = forumUi.parseButtonStyle(interaction.fields.getTextInputValue('style'));
+        const response = String(interaction.fields.getTextInputValue('response') || '').trim();
+        if (!label || !response) {
+            await replyEphemeral(interaction, { content: 'لازم تكتب اسم الزر واللي يظهر 3:' });
+            return true;
+        }
+        const buttons = Array.isArray(draft.buttons) ? [...draft.buttons] : [];
+        if (buttons.length >= 5) {
+            await replyEphemeral(interaction, { content: 'الحد الأقصى 5 أزرار 3:' });
+            return true;
+        }
+        buttons.push({ label: label.slice(0, 80), style, options: [{ label: label.slice(0, 80), response: response.slice(0, 1900) }] });
+        forumUi.updateDraft(postId, { buttons });
+
+        const next = forumUi.getDraft(postId);
+        const embed = forumCmd.buildDraftPreviewEmbed(next, interaction.user.tag);
+        const components = forumCmd.buildForumUiRows(interaction.user.id, postId);
+        await replyEphemeral(interaction, { content: `✅ تمت إضافة الزر **${label.slice(0, 80)}**.`, embeds: [embed], components });
         return true;
     }
 

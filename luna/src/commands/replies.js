@@ -125,7 +125,14 @@ module.exports = {
                 .setDisabled(embedCount === 0)
         );
 
-        const components = [row1, row2, row3];
+        const row4 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('replies:random')
+                .setLabel('رد عشوائي نادر')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('🌌')
+        );
+        const components = [row1, row2, row3, row4];
 
         // One entry per channel embed; picking one opens its edit/delete card.
         if (channelReplies.length) {
