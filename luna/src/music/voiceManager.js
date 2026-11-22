@@ -456,7 +456,7 @@ async function playNextFromQueue(guildId) {
 
     const source = trackSource(next);
     if (!source) return false;
-    await startPlaybackFromFile(makeInternalInteraction(guildId, next.requestedBy), source, next.displayName || source);
+    await startPlaybackFromFile(makeInternalInteraction(guildId, next.requestedBy), source, next.displayName || source, { durationMs: next.durationMs });
     return true;
 }
 
@@ -527,7 +527,7 @@ function getPlayBrowseCache(guildId, userId, catKey) {
     return v;
 }
 
-async function startPlaybackFromFile(interaction, filePath, displayName) {
+async function startPlaybackFromFile(interaction, filePath, displayName, meta = {}) {
     if (!interaction.guild) return;
 
     const voice = interaction.member && interaction.member.voice ? interaction.member.voice : null;
@@ -632,6 +632,12 @@ async function startPlaybackFromFile(interaction, filePath, displayName) {
     } catch {
         // ignore
     }
+
+    // yt-dlp already knows the duration; keep it for the progress bar since
+    // piped streams don't always expose a Duration line to ffmpeg.
+    try {
+        if (meta && Number(meta.durationMs) > 0) session.trackDurationMs = Number(meta.durationMs);
+    } catch { /* ignore */ }
 
     const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
     const isAbortErr = (err) => {
@@ -804,9 +810,9 @@ async function startPlaybackFromFile(interaction, filePath, displayName) {
 
         const isUrl = isHttpSource(filePath);
         const ffmpegArgs = [
-            ...(isUrl ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'] : []),
+            ...(!isUrl ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5'] : []),
             ...(startOffsetSec ? ['-ss', String(startOffsetSec)] : []),
-            '-i', filePath,
+            '-i', isUrl ? 'pipe:0' : filePath,
             '-vn',
             '-f', 's16le',
             '-ar', '48000',
@@ -814,8 +820,26 @@ async function startPlaybackFromFile(interaction, filePath, displayName) {
             'pipe:1'
         ];
 
-        const ffmpeg = spawn(ffmpegPath, ffmpegArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
+        // This static ffmpeg can't open HTTPS reliably on this server, but
+        // Node's fetch can. Stream the bytes into ffmpeg over stdin instead.
+        const ffmpeg = spawn(ffmpegPath, ffmpegArgs, {
+            stdio: [isUrl ? 'pipe' : 'ignore', 'pipe', 'pipe']
+        });
         session.ffmpeg = ffmpeg;
+
+        if (isUrl) {
+            (async () => {
+                try {
+                    const { Readable } = require('stream');
+                    const resp = await fetch(filePath);
+                    if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp && resp.status}`);
+                    Readable.fromWeb(resp.body).pipe(ffmpeg.stdin);
+                } catch (err) {
+                    logError('Music playback - stream fetch failed', err, { guildId: interaction.guild.id });
+                    try { ffmpeg.kill('SIGKILL'); } catch { /* ignore */ }
+                }
+            })();
+        }
 
         ffmpeg.on('error', (e) => logError('Music playback - ffmpeg spawn error', e, { guildId: interaction.guild.id, filePath }));
         ffmpeg.stderr.on('data', (buf) => {
@@ -935,8 +959,8 @@ function fmtMmSs(ms) {
 
 // Online playback reuses the local-file pipeline: ffmpeg takes either a path
 // or an http(s) stream URL, so only the source representation differs.
-async function startPlaybackFromUrl(interaction, url, displayName) {
-    return startPlaybackFromFile(interaction, String(url), displayName || String(url));
+async function startPlaybackFromUrl(interaction, url, displayName, meta = {}) {
+    return startPlaybackFromFile(interaction, String(url), displayName || String(url), meta);
 }
 
 module.exports = {

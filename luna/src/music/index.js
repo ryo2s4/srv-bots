@@ -106,7 +106,7 @@ function createMusicAPI(client) {
                 addToQueue(guildId, entry);
                 return { queued: true, title: track.title };
             }
-            await startPlaybackFromUrl(interaction, track.url, track.title);
+            await startPlaybackFromUrl(interaction, track.url, track.title, { durationMs: track.durationMs });
             return { queued: false, title: track.title };
         },
         addToQueue(guildId, track) {
