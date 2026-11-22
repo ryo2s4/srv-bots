@@ -2076,6 +2076,7 @@ client.on('interactionCreate', async interaction => {
                     prize: [['points', 'Luna Points للفائز (دائمًا)', String(c.prizePoints || 100)]],
                     giftchance: [['percent', 'احتمال نزول هدية إضافية %', String(c.giftChancePct == null ? 30 : c.giftChancePct)]],
                     duration: [['minutes', 'مدة الجيف أواي بالدقائق (1-1440)', String(c.giveawayMinutes || 5)]],
+                    math: [['percent', 'نسبة أسئلة الرياضيات في الحدث %', String(c.mathChancePct == null ? 3 : c.mathChancePct)]],
                     gifts: [['gifts', 'الهدايا (سطر لكل هدية: الاسم|الندرة|نقاط)', (c.gifts || []).map((g) => `${g.name}|${g.rarity || 'common'}|${g.points || 0}`).join('\n').slice(0, 1000)]]
                 };
                 if (action === 'gifts') {
@@ -2161,6 +2162,7 @@ client.on('interactionCreate', async interaction => {
             if (action === 'prize') update({ prizePoints: Math.max(0, Number(interaction.fields.getTextInputValue('points')) || 0) });
             if (action === 'giftchance') update({ giftChancePct: Math.max(0, Math.min(100, Number(interaction.fields.getTextInputValue('percent')) || 0)) });
             if (action === 'duration') update({ giveawayMinutes: Math.max(1, Math.min(1440, Number(interaction.fields.getTextInputValue('minutes')) || 5)) });
+            if (action === 'math') update({ mathChancePct: Math.max(0, Math.min(100, Number(interaction.fields.getTextInputValue('percent')) || 0)) });
             const p = require('./commands/fun').panel(interaction.guild.id, interaction.user.tag);
             try { await interaction.reply({ embeds: [p.embed], components: p.components, flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
             return;

@@ -888,7 +888,7 @@ const MATH_BRUTAL_BANK = [
 // ---------- مساعدات للألعاب الخارجية (/trivia) ومضاعفات المكافآت ----------
 
 // مجموع أسئلة التحدي الفردي — خليط من كل بنوك الأسئلة الصعبة
-function getTriviaPool() {
+function getTriviaPool(mathPct = 3) {
     const pool = [];
     const add = (q, correct, opts) => pool.push({
         q: String(q),
@@ -904,9 +904,11 @@ function getTriviaPool() {
     for (const l of LOGIC_ORDER_BANK) add(l.q, l.a, l.opts);
     for (const w of WORD_PROBLEM_BANK) add(w.q, w.a, w.opts);
     for (const m of MATRIX_BANK) add(`أكمل المصفوفة:\n\`\`\`\n${m.grid.join('\n')}\n\`\`\``, m.a, m.t);
-    // Keep the brutal math questions RARE — only a few enter the pool per
-    // build, so most events stay normal and nobody strokes out.
-    const mathSample = [...MATH_BRUTAL_BANK].sort(() => Math.random() - 0.5).slice(0, 3);
+    // Math questions are a configurable percentage of the pool. Raising this
+    // makes them show up more often; lowering it keeps events survivable.
+    const pct = Math.max(0, Math.min(100, Number(mathPct) || 0));
+    const mathCount = Math.min(MATH_BRUTAL_BANK.length, Math.round(pool.length * pct / 100));
+    const mathSample = [...MATH_BRUTAL_BANK].sort(() => Math.random() - 0.5).slice(0, mathCount);
     for (const h of mathSample) add(`🧮 ${h.q}`, h.a, h.opts);
     return pool;
 }

@@ -174,7 +174,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
     if (type === 'trivia') {
         // Reuse the harder /events question banks (general knowledge, English,
         // riddles) so competitive events are genuinely difficult.
-        const pool = getTriviaPool();
+        const pool = getTriviaPool(c.mathChancePct);
         const t = pool.length
             ? pool[Math.floor(Math.random() * pool.length)]
             : { q: 'كم عدد الكواكب في المجموعة الشمسية؟', correct: '8', opts: ['8', '9', '7', '10'] };
