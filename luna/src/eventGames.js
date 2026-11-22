@@ -904,7 +904,10 @@ function getTriviaPool() {
     for (const l of LOGIC_ORDER_BANK) add(l.q, l.a, l.opts);
     for (const w of WORD_PROBLEM_BANK) add(w.q, w.a, w.opts);
     for (const m of MATRIX_BANK) add(`أكمل المصفوفة:\n\`\`\`\n${m.grid.join('\n')}\n\`\`\``, m.a, m.t);
-    for (const h of MATH_BRUTAL_BANK) add(`🧮 ${h.q}`, h.a, h.opts);
+    // Keep the brutal math questions RARE — only a few enter the pool per
+    // build, so most events stay normal and nobody strokes out.
+    const mathSample = [...MATH_BRUTAL_BANK].sort(() => Math.random() - 0.5).slice(0, 3);
+    for (const h of mathSample) add(`🧮 ${h.q}`, h.a, h.opts);
     return pool;
 }
 
