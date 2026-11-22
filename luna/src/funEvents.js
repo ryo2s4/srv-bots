@@ -145,7 +145,13 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
     const c = cfg.funEvents || {};
     const guild = client.guilds.cache.get(String(guildId));
     if (!guild) return { ok: false, error: 'guild not found' };
-    const channelId = c.giveawayChannelId || c.channelId;
+    const type = forcedType || (Math.random() < 0.5 ? 'trivia' : 'giveaway');
+
+    // Giveaways go to their own channel; games/trivia stay in the events
+    // channel. Fall back to the other one only if a channel isn't configured.
+    const channelId = type === 'giveaway'
+        ? (c.giveawayChannelId || c.channelId)
+        : (c.channelId || c.giveawayChannelId);
     const channel = channelId ? guild.channels.cache.get(String(channelId)) : null;
     if (!channel || typeof channel.send !== 'function') return { ok: false, error: 'no event channel' };
 
@@ -154,7 +160,6 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
         ? { parse: [], roles: [String(c.roleId)] }
         : { parse: [] };
 
-    const type = forcedType || (Math.random() < 0.5 ? 'trivia' : 'giveaway');
     const gift = pickWeighted(c.gifts);
     const id = `fun_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     let resolveDone;
