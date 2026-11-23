@@ -3555,11 +3555,13 @@ client.on('interactionCreate', async interaction => {
                 const row = new ActionRowBuilder().addComponents(
                     new ChannelSelectMenuBuilder()
                         .setCustomId('autoreact:channelselect')
-                        .setPlaceholder('اختر الروم')
+                        .setPlaceholder('اختر روم أو أكثر')
+                        .setMinValues(1)
+                        .setMaxValues(25)
                         .setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                 );
                 return interaction.reply({
-                    content: '**⚡ الرياكشن التلقائي**\nاختر الروم المستهدف:',
+                    content: '**⚡ الرياكشن التلقائي**\nاختر روم أو أكثر (يمكنك إضافة رومات أخرى لاحقًا):',
                     components: [row],
                     flags: MessageFlags.Ephemeral
                 });
@@ -3581,14 +3583,38 @@ client.on('interactionCreate', async interaction => {
                 });
             }
 
+            // Remove one of the configured channels
+            if (action === 'remove') {
+                const { StringSelectMenuBuilder } = require('discord.js');
+                const current = Array.isArray(ar.channelIds)
+                    ? ar.channelIds
+                    : (ar.channelId ? [ar.channelId] : []);
+                if (!current.length) {
+                    return interaction.reply({ content: 'لا توجد رومات مضافة أصلاً.', flags: MessageFlags.Ephemeral });
+                }
+                const row = new ActionRowBuilder().addComponents(
+                    new StringSelectMenuBuilder()
+                        .setCustomId('autoreact:removeselect')
+                        .setPlaceholder('اختر الروم اللي تحذفه')
+                        .addOptions(current.slice(0, 25).map((id) => ({ label: `<#${id}>`.slice(0, 100), value: String(id) })))
+                );
+                return interaction.reply({
+                    content: '➖ اختر الروم الذي تريد إزالته:',
+                    components: [row],
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
             // Toggle
             if (action === 'toggle') {
-                const chId = ar.channelId;
+                const current = Array.isArray(ar.channelIds)
+                    ? ar.channelIds
+                    : (ar.channelId ? [ar.channelId] : []);
                 const emojis = Array.isArray(ar.emojis) ? ar.emojis : [];
-                if (chId && emojis.length > 0) {
+                if (current.length && emojis.length > 0) {
                     updateGuildConfig(interaction.guild.id, (c) => ({
                         ...c,
-                        autoReactions: { ...ar, channelId: null }
+                        autoReactions: { ...ar, channelIds: [], channelId: null }
                     }));
                     return interaction.update({
                         embeds: [new EmbedBuilder().setColor(0xed4245).setTitle('⚡ الرياكشن التلقائي').setDescription('تم تعطيل الرياكشن التلقائي.')],
@@ -3604,14 +3630,16 @@ client.on('interactionCreate', async interaction => {
 
             // Preview
             if (action === 'preview') {
-                const chId = ar.channelId || null;
+                const current = Array.isArray(ar.channelIds)
+                    ? ar.channelIds
+                    : (ar.channelId ? [ar.channelId] : []);
                 const emojis = Array.isArray(ar.emojis) ? ar.emojis : [];
                 const excludedRoles = Array.isArray(ar.excludedRoles) ? ar.excludedRoles : [];
                 const embed = new EmbedBuilder()
-                    .setColor(chId && emojis.length ? 0x57f287 : 0xed4245)
+                    .setColor(current.length && emojis.length ? 0x57f287 : 0xed4245)
                     .setTitle('⚡ معاينة الإعدادات')
                     .addFields(
-                        { name: '📍 الروم', value: chId ? `<#${chId}>` : 'غير محدد', inline: true },
+                        { name: `📍 الرومات (${current.length})`, value: current.length ? current.map(c => `<#${c}>`).join('\n').slice(0, 1024) : 'غير محدد', inline: true },
                         { name: '🎭 الإيموجيات', value: emojis.length ? emojis.join(' ') : 'غير محدد', inline: true },
                         { name: '🚫 مستثنى', value: excludedRoles.length ? excludedRoles.map(r => `<@&${r}>`).join(', ') : 'لا يوجد', inline: false }
                     );
@@ -3622,7 +3650,7 @@ client.on('interactionCreate', async interaction => {
             if (action === 'clear') {
                 updateGuildConfig(interaction.guild.id, (c) => ({
                     ...c,
-                    autoReactions: { channelId: null, emojis: [], excludedRoles: [] }
+                    autoReactions: { channelIds: [], channelId: null, emojis: [], excludedRoles: [] }
                 }));
                 return interaction.update({
                     embeds: [new EmbedBuilder().setColor(0xed4245).setTitle('⚡ الرياكشن التلقائي').setDescription('تم إعادة تعيين جميع الإعدادات.')],
@@ -3637,9 +3665,22 @@ client.on('interactionCreate', async interaction => {
             if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageMessages)) {
                 return interaction.reply({ content: 'عذراً، تحتاج صلاحية Manage Messages.', flags: MessageFlags.Ephemeral });
             }
-            const channelId = interaction.values[0];
+            const selected = (Array.isArray(interaction.values) ? interaction.values : [])
+                .filter((id) => /^\d{15,20}$/.test(String(id))).slice(0, 25);
+            if (!selected.length) {
+                return interaction.reply({ content: 'ما اخترت أي روم صالح.', flags: MessageFlags.Ephemeral });
+            }
+            // Merge with existing channels so this also works for adding more.
+            updateGuildConfig(interaction.guild.id, (c) => {
+                const ar = c.autoReactions && typeof c.autoReactions === 'object' ? c.autoReactions : {};
+                const existing = Array.isArray(ar.channelIds)
+                    ? ar.channelIds
+                    : (ar.channelId ? [ar.channelId] : []);
+                const merged = [...new Set([...existing, ...selected])].slice(0, 25);
+                return { ...c, autoReactions: { ...ar, channelIds: merged } };
+            });
             const modal = new ModalBuilder()
-                .setCustomId(`autoreact:emojimodal:${channelId}`)
+                .setCustomId('autoreact:emojimodal')
                 .setTitle('إعداد الإيموجيات')
                 .addComponents(
                     new ActionRowBuilder().addComponents(
@@ -3653,6 +3694,28 @@ client.on('interactionCreate', async interaction => {
                     )
                 );
             return interaction.showModal(modal);
+        }
+
+        // Autoreact: remove one of several channels
+        if (interaction.isStringSelectMenu() && interaction.customId === 'autoreact:removeselect') {
+            if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageMessages)) {
+                return interaction.reply({ content: 'عذراً، تحتاج صلاحية Manage Messages.', flags: MessageFlags.Ephemeral });
+            }
+            const remove = Array.isArray(interaction.values) ? interaction.values : [];
+            const saved = updateGuildConfig(interaction.guild.id, (c) => {
+                const ar = c.autoReactions && typeof c.autoReactions === 'object' ? c.autoReactions : {};
+                const all = Array.isArray(ar.channelIds) ? ar.channelIds : (ar.channelId ? [ar.channelId] : []);
+                const channels = all.filter((id) => !remove.includes(String(id)));
+                return {
+                    ...c,
+                    autoReactions: { ...ar, channelIds: channels, channelId: channels[0] || null }
+                };
+            });
+            const channels = Array.isArray(saved.autoReactions.channelIds) ? saved.autoReactions.channelIds : [];
+            return interaction.reply({
+                content: `➖ تمت الإزالة. الرومات المتبقية: ${channels.length ? channels.map(c => `<#${c}>`).join(' ') : 'لا يوجد'}`,
+                flags: MessageFlags.Ephemeral
+            });
         }
 
         // Autoreact: Role Select (for exclusion)
@@ -3675,28 +3738,33 @@ client.on('interactionCreate', async interaction => {
         }
 
         // Autoreact: Emoji Modal Submit
-        if (interaction.isModalSubmit() && typeof interaction.customId === 'string' && interaction.customId.startsWith('autoreact:emojimodal:')) {
+        if (interaction.isModalSubmit() && typeof interaction.customId === 'string' && interaction.customId.startsWith('autoreact:emojimodal')) {
             if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageMessages)) {
                 return interaction.reply({ content: 'عذراً، تحتاج صلاحية Manage Messages.', flags: MessageFlags.Ephemeral });
             }
-            const channelId = interaction.customId.split(':')[2];
+            const legacyId = interaction.customId.split(':')[2] || null;
             const emojisRaw = interaction.fields.getTextInputValue('emojis');
             const emojis = String(emojisRaw || '').trim().split(/\s+/g).map(s => s.trim()).filter(Boolean).slice(0, 10);
-            
+
             if (!emojis.length) {
                 return interaction.reply({ content: 'يرجى إدخال إيموجي واحد على الأقل.', flags: MessageFlags.Ephemeral });
             }
-            
-            updateGuildConfig(interaction.guild.id, (c) => {
+
+            const saved = updateGuildConfig(interaction.guild.id, (c) => {
                 const ar = c.autoReactions && typeof c.autoReactions === 'object' ? c.autoReactions : {};
+                const existing = Array.isArray(ar.channelIds)
+                    ? ar.channelIds
+                    : (ar.channelId ? [ar.channelId] : (legacyId ? [legacyId] : []));
+                const channels = [...new Set(existing)].slice(0, 25);
                 return {
                     ...c,
-                    autoReactions: { ...ar, channelId, emojis }
+                    autoReactions: { ...ar, channelIds: channels, channelId: channels[0] || null, emojis }
                 };
             });
-            
+            const channels = Array.isArray(saved.autoReactions.channelIds) ? saved.autoReactions.channelIds : [];
+
             return interaction.reply({
-                content: `**⚡ تم التفعيل**\n📍 الروم: <#${channelId}>\n🎭 الإيموجيات: ${emojis.join(' ')}`,
+                content: `**⚡ تم التفعيل**\n📍 الرومات (${channels.length}): ${channels.length ? channels.map(c => `<#${c}>`).join(' ') : '—'}\n🎭 الإيموجيات: ${emojis.join(' ')}`,
                 flags: MessageFlags.Ephemeral
             });
         }
@@ -8837,10 +8905,12 @@ client.on('messageCreate', async message => {
 
     if (config && config.autoReactions && typeof config.autoReactions === 'object') {
         const ar = config.autoReactions;
-        const chId = typeof ar.channelId === 'string' ? ar.channelId : null;
+        const channels = Array.isArray(ar.channelIds)
+            ? ar.channelIds
+            : (typeof ar.channelId === 'string' && ar.channelId ? [ar.channelId] : []);
         const emojis = Array.isArray(ar.emojis) ? ar.emojis : [];
         const excludedRoles = Array.isArray(ar.excludedRoles) ? ar.excludedRoles : [];
-        if (chId && message.channel.id === chId && emojis.length) {
+        if (channels.length && channels.includes(message.channel.id) && emojis.length) {
             // Check if user has excluded role
             const hasExcludedRole = excludedRoles.length > 0 && message.member?.roles?.cache
                 ? message.member.roles.cache.some(r => excludedRoles.includes(r.id))

@@ -41,10 +41,12 @@ module.exports = {
 
         const cfg = getGuildConfig(interaction.guild.id);
         const ar = cfg.autoReactions && typeof cfg.autoReactions === 'object' ? cfg.autoReactions : {};
-        const chId = ar.channelId || null;
+        const channels = Array.isArray(ar.channelIds)
+            ? ar.channelIds
+            : (ar.channelId ? [ar.channelId] : []);
         const emojis = Array.isArray(ar.emojis) ? ar.emojis : [];
         const excludedRoles = Array.isArray(ar.excludedRoles) ? ar.excludedRoles : [];
-        const isEnabled = !!chId && emojis.length > 0;
+        const isEnabled = channels.length > 0 && emojis.length > 0;
 
         const embed = new EmbedBuilder()
             .setColor(isEnabled ? 0x57f287 : 0xed4245)
@@ -54,8 +56,8 @@ module.exports = {
                 : 'النظام معطّل حالياً. اضغط "تفعيل" لبدء الإعداد.')
             .addFields(
                 {
-                    name: '📍 الروم المستهدف',
-                    value: chId ? `<#${chId}>` : 'غير محدد',
+                    name: `📍 الرومات (${channels.length})`,
+                    value: channels.length ? channels.map(c => `<#${c}>`).join('\n').slice(0, 1024) : 'غير محدد',
                     inline: true
                 },
                 {
@@ -92,8 +94,14 @@ module.exports = {
 
         const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
+                .setCustomId('autoreact:remove')
+                .setLabel('إزالة روم')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('➖')
+                .setDisabled(channels.length === 0),
+            new ButtonBuilder()
                 .setCustomId('autoreact:preview')
-                .setLabel('معاينة الإعدادات')
+                .setLabel('معاينة')
                 .setStyle(ButtonStyle.Secondary)
                 .setEmoji('👁️'),
             new ButtonBuilder()

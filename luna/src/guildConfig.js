@@ -131,7 +131,8 @@ function defaultGuildConfig() {
             memoryTtlMs: 2 * 60 * 60 * 1000
         },
         autoReactions: {
-            channelId: null,
+            channelIds: [],
+            channelId: null, // legacy single channel, kept for compatibility
             emojis: []
         },
         lootboxes: {
@@ -466,10 +467,18 @@ function normalizeConfig(cfg) {
     out.ai.memoryTtlMs = Math.max(0, Math.floor(out.ai.memoryTtlMs || 0));
 
     if (!out.autoReactions || typeof out.autoReactions !== 'object') {
-        out.autoReactions = { channelId: null, emojis: [] };
+        out.autoReactions = { channelIds: [], channelId: null, emojis: [] };
         changed = true;
     }
     if (typeof out.autoReactions.channelId !== 'string' && out.autoReactions.channelId !== null) { out.autoReactions.channelId = null; changed = true; }
+    if (!Array.isArray(out.autoReactions.channelIds)) { out.autoReactions.channelIds = []; changed = true; }
+    const legacyCh = out.autoReactions.channelId;
+    if (legacyCh && !out.autoReactions.channelIds.includes(legacyCh)) {
+        out.autoReactions.channelIds.push(legacyCh);
+        changed = true;
+    }
+    out.autoReactions.channelIds = out.autoReactions.channelIds
+        .map(String).filter((s) => /^\d{15,20}$/.test(s)).slice(0, 25);
     if (!Array.isArray(out.autoReactions.emojis)) { out.autoReactions.emojis = []; changed = true; }
     out.autoReactions.emojis = out.autoReactions.emojis.map(String).map((s) => s.trim()).filter(Boolean).slice(0, 10);
 
