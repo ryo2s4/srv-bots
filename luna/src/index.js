@@ -3,7 +3,12 @@ require('dotenv').config({ override: true });
 // Load encryption library for Discord voice (must be loaded before @discordjs/voice)
 require('libsodium-wrappers');
 
-const { Client, Collection, GatewayIntentBits, Partials, PermissionsBitField, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType } = require('discord.js');
+const {
+    Client, Collection, GatewayIntentBits, Partials, PermissionFlagsBits, PermissionsBitField,
+    MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType,
+    StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelSelectMenuBuilder, RoleSelectMenuBuilder,
+    MentionableSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType
+} = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -3433,11 +3438,19 @@ client.on('interactionCreate', async interaction => {
                 try { return interaction.reply({ content: 'ليس لدي صلاحية الإرسال في هذا الروم.', flags: MessageFlags.Ephemeral }); } catch { return; }
             }
 
+            // Acknowledge first: a slow send must not burn the 3-second window
+            // and leave the owner with a dead "Unknown interaction" popup.
+            try {
+                await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            } catch {
+                return;
+            }
+
             try {
                 await channel.send({ content: msg });
-                try { return interaction.reply({ content: `✅ تم إرسال الرسالة بنجاح إلى **${guild.name}** > ${channel}`, flags: MessageFlags.Ephemeral }); } catch { return; }
+                try { return await interaction.editReply({ content: `✅ تم إرسال الرسالة بنجاح إلى **${guild.name}** > ${channel}` }); } catch { return; }
             } catch (e) {
-                try { return interaction.reply({ content: `❌ فشل الإرسال: ${String(e).slice(0, 200)}`, flags: MessageFlags.Ephemeral }); } catch { return; }
+                try { return await interaction.editReply({ content: `❌ فشل الإرسال: ${String(e).slice(0, 500)}` }); } catch { return; }
             }
         }
 
