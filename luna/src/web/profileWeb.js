@@ -8,20 +8,7 @@ const { getTotalBoostSummary } = require('../boostMeta');
 const { getTotalRuneSummary } = require('../runes');
 const { buildYouData, handleAction } = require('./youPage');
 const { renderYou } = require('./renderYou');
-
-function esc(s) {
-    return String(s ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-function fmtNum(n) {
-    const x = Math.floor(Number(n) || 0);
-    return x.toLocaleString('en-US');
-}
+const { page, profileContent } = require('./layout');
 
 function pct(mult) {
     return Math.max(0, Math.round((Number(mult) - 1) * 100));
@@ -74,160 +61,39 @@ async function buildProfileView(client, guildId, userId) {
     const runeTotals = getTotalRuneSummary(equippedRunes);
     const combined = combineTotals(shopTotals, roleTotals, runeTotals);
 
-    const lvl = Math.max(0, Math.floor(Number(stats.level) || 0));
-    const xp = Math.max(0, Math.floor(Number(stats.xp) || 0));
-    const nextXp = Math.max(1, Math.floor(Number(xpForNextLevel(lvl)) || 1));
-    const luna = Math.max(0, Math.floor(Number(stats.lunaPoints) || 0));
-
     return {
         guildName: guild?.name || 'Server',
         username: user?.globalName || user?.username || 'Unknown User',
         handle: user?.username ? `@${user.username}` : '',
         avatar: user?.displayAvatarURL?.({ size: 256, extension: 'png' }) || '',
-        level: lvl,
-        xp,
-        nextXp,
-        luna,
-        boosts: {
-            xp: pct(combined.xp),
-            luna: pct(combined.luna),
-            levelup: pct(combined.levelup)
-        }
+        level: Math.max(0, Math.floor(Number(stats.level) || 0)),
+        xp: Math.max(0, Math.floor(Number(stats.xp) || 0)),
+        nextXp: Math.max(1, Math.floor(Number(xpForNextLevel(Math.max(0, Math.floor(Number(stats.level) || 0)))) || 1)),
+        luna: Math.max(0, Math.floor(Number(stats.lunaPoints) || 0)),
+        boosts: { xp: pct(combined.xp), luna: pct(combined.luna), levelup: pct(combined.levelup) }
     };
 }
 
-function renderHtml(view, opts = {}) {
-    const xpPct = Math.max(0, Math.min(100, (view.xp / view.nextXp) * 100));
-    const boostRow = (label, icon, value) => `
-      <div class="boost">
-        <div class="boost-label">${icon} <span>${esc(label)}</span></div>
-        <div class="boost-value">+${fmtNum(value)}%</div>
-      </div>`;
-
-    return `<!doctype html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="noindex,nofollow" />
-  <title>${esc(view.username)} — Luna Profile</title>
-  <style>
-    :root { --bg:#0b1020; --card:#151b2f; --card2:#1b2340; --text:#eef2ff; --muted:#a9b4d0; --accent:#c4a7ff; --accent2:#7dd3fc; --line:rgba(255,255,255,.08); }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:radial-gradient(1200px 600px at 50% -10%, rgba(196,167,255,.22), transparent 60%), var(--bg); color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
-    .card { width:min(720px,100%); background:linear-gradient(180deg, rgba(255,255,255,.03), transparent 30%), var(--card); border:1px solid var(--line); border-radius:24px; padding:28px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
-    .top { display:flex; gap:18px; align-items:center; }
-    .avatar { width:88px; height:88px; border-radius:22px; object-fit:cover; background:#222; border:1px solid var(--line); }
-    .name { font-size:28px; font-weight:800; line-height:1.15; }
-    .handle { color:var(--muted); margin-top:4px; font-size:14px; }
-    .guild { color:var(--accent2); font-size:13px; margin-top:8px; }
-    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:22px; }
-    .stat { background:var(--card2); border:1px solid var(--line); border-radius:18px; padding:16px; }
-    .label { color:var(--muted); font-size:13px; margin-bottom:8px; }
-    .value { font-size:28px; font-weight:800; }
-    .xp { margin-top:14px; background:var(--card2); border:1px solid var(--line); border-radius:18px; padding:16px; }
-    .bar { height:12px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; margin-top:10px; }
-    .fill { height:100%; width:${xpPct.toFixed(2)}%; background:linear-gradient(90deg,var(--accent),var(--accent2)); }
-    .xp-meta { display:flex; justify-content:space-between; gap:12px; color:var(--muted); font-size:13px; margin-top:8px; }
-    .section-title { margin-top:22px; margin-bottom:10px; font-size:16px; font-weight:700; color:var(--accent); }
-    .boosts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-    .boost { background:var(--card2); border:1px solid var(--line); border-radius:16px; padding:14px; }
-    .boost-label { color:var(--muted); font-size:13px; display:flex; gap:8px; align-items:center; }
-    .boost-value { font-size:24px; font-weight:800; margin-top:8px; }
-    .foot { margin-top:22px; color:var(--muted); font-size:12px; text-align:center; }
-    .mainnav,.subnav { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0 4px; }
-    .mainnav a,.subnav a { text-decoration:none; color:var(--muted); background:var(--card2); border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:13px; }
-    .mainnav a.active,.subnav a.active { color:var(--text); border-color:var(--accent); background:rgba(196,167,255,.14); }
-    .panel { background:var(--card2); border:1px solid var(--line); border-radius:18px; padding:16px; margin-top:14px; }
-    .panel h3 { margin:0 0 12px; font-size:15px; color:var(--accent); }
-    .card-row { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:10px 0; border-top:1px solid var(--line); }
-    .card-row:first-of-type { border-top:0; }
-    .row-main { flex:1 1 240px; min-width:0; }
-    .row-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .rune-title { font-weight:700; }
-    .muted { color:var(--muted); font-size:12px; }
-    .price { margin-top:6px; font-size:14px; }
-    .pill { display:inline-block; background:rgba(125,211,252,.14); color:var(--accent2); border-radius:999px; padding:2px 8px; font-size:11px; margin-inline-start:6px; }
-    .balance-bar { background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:12px 16px; margin-top:14px; color:var(--muted); font-size:13px; }
-    .balance-bar b { color:var(--text); }
-    .flash { margin-top:14px; border-radius:14px; padding:12px 16px; font-size:13px; line-height:1.6; }
-    .flash.ok { background:rgba(125,211,252,.10); border:1px solid rgba(125,211,252,.3); color:var(--accent2); }
-    .flash.err { background:rgba(255,120,120,.10); border:1px solid rgba(255,120,120,.3); color:#ffb4b4; }
-    .inline { display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .stack { display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
-    .grid2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-    .you-content ul { margin:0; padding-inline-start:18px; line-height:1.8; font-size:13px; }
-    input,select { background:#10162a; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font:inherit; font-size:13px; }
-    .btn { cursor:pointer; border:1px solid var(--accent); border-radius:10px; padding:8px 12px; background:var(--accent); color:#15102a; font-weight:700; font-size:13px; }
-    .btn.ghost { background:transparent; color:var(--text); border-color:var(--line); }
-    .btn.danger { background:#e06a6a; border-color:#e06a6a; color:#fff; }
-    @media (max-width:640px){ .grid,.boosts,.grid2{grid-template-columns:1fr;} .name{font-size:24px;} .avatar{width:72px;height:72px;border-radius:18px;} .row-actions{width:100%;} }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <div class="mainnav">
-      <a class="${opts.tab === 'you' ? '' : 'active'}" href="./">🌙 البروفايل</a>
-      <a class="${opts.tab === 'you' ? 'active' : ''}" href="?tab=you">⚙️ أنت</a>
-    </div>
-    <div class="top">
-      ${view.avatar ? `<img class="avatar" src="${esc(view.avatar)}" alt="avatar" />` : `<div class="avatar"></div>`}
-      <div>
-        <div class="name">${esc(view.username)}</div>
-        ${view.handle ? `<div class="handle">${esc(view.handle)}</div>` : ''}
-        <div class="guild">🌙 ${esc(view.guildName)}</div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="stat"><div class="label">المستوى</div><div class="value">${fmtNum(view.level)}</div></div>
-      <div class="stat"><div class="label">نقاط لونا</div><div class="value">${fmtNum(view.luna)}</div></div>
-    </div>
-
-    <div class="xp">
-      <div class="label">تقدم الخبرة</div>
-      <div class="bar"><div class="fill"></div></div>
-      <div class="xp-meta"><span>${fmtNum(view.xp)} / ${fmtNum(view.nextXp)} XP</span><span>${xpPct.toFixed(1)}%</span></div>
-    </div>
-
-    <div class="section-title">إجمالي البوستات (رتب + رونات + بوستات المتجر)</div>
-    <div class="boosts">
-      ${boostRow('XP', '⚡', view.boosts.xp)}
-      ${boostRow('Luna', '💰', view.boosts.luna)}
-      ${boostRow('Level-Up', '🏅', view.boosts.levelup)}
-    </div>
-
-    ${opts.content || ''}
-
-    <div class="foot">Luna Profile • هذا الرابط خاص — لا تشاركه إذا ما تبي أحد يشوفه</div>
-  </main>
-</body>
-</html>`;
-}
-
 function notFoundHtml() {
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="robots" content="noindex,nofollow"/><title>Profile not found</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b1020;color:#eef2ff;font-family:system-ui,sans-serif}.box{padding:28px 32px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:#151b2f;text-align:center}p{color:#a9b4d0}</style></head>
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Profile not found</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#080c18;color:#f2f5ff;font-family:system-ui,sans-serif}.box{padding:28px 32px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:#121a2d;text-align:center}p{color:#9aa8c7}</style></head>
 <body><div class="box"><h1>404</h1><p>Profile link not found.</p></div></body></html>`;
 }
 
 function getProfileWebConfig() {
     const port = Math.max(1, Math.floor(Number(process.env.PROFILE_WEB_PORT || 3210) || 3210));
     const baseUrlRaw = String(process.env.PROFILE_WEB_BASE_URL || '').trim().replace(/\/+$/, '');
-    const baseUrl = baseUrlRaw || `http://localhost:${port}`;
-    return { port, baseUrl };
+    return { port, baseUrl: baseUrlRaw || `http://localhost:${port}` };
 }
 
 function getProfileWebUrl(guildId, userId) {
     const token = getOrCreateProfileWebToken(guildId, userId);
-    const { baseUrl } = getProfileWebConfig();
-    return `${baseUrl}/p/${encodeURIComponent(token)}`;
+    return `${getProfileWebConfig().baseUrl}/p/${encodeURIComponent(token)}`;
 }
 
 function startProfileWeb(client) {
     const { port, baseUrl } = getProfileWebConfig();
-    const enabledRaw = String(process.env.PROFILE_WEB_ENABLED || 'true').trim().toLowerCase();
-    if (enabledRaw === '0' || enabledRaw === 'false' || enabledRaw === 'off') {
+    if (['0', 'false', 'off'].includes(String(process.env.PROFILE_WEB_ENABLED || 'true').trim().toLowerCase())) {
         console.log('[profile-web] disabled by PROFILE_WEB_ENABLED');
         return null;
     }
@@ -248,7 +114,8 @@ function startProfileWeb(client) {
             const actionMatch = url.pathname.match(/^\/p\/([a-f0-9]{32,128})\/action\/?$/i);
             const viewMatch = url.pathname.match(/^\/p\/([a-f0-9]{32,128})\/?$/i);
             const matched = actionMatch || viewMatch;
-            if (!matched || (req.method !== 'GET' && req.method !== 'POST')) {
+
+            if (!matched || !['GET', 'POST'].includes(req.method)) {
                 res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
                 res.end(notFoundHtml());
                 return;
@@ -262,62 +129,59 @@ function startProfileWeb(client) {
                 return;
             }
 
-            let flash = null;
-            if (actionMatch && req.method === 'POST') {
+            if (actionMatch) {
+                if (req.method !== 'POST') {
+                    res.writeHead(405, { Allow: 'POST', 'Cache-Control': 'no-store' });
+                    res.end();
+                    return;
+                }
                 const form = await readBody(req);
                 const result = await handleAction(client, resolved.guildId, resolved.userId, form);
-                flash = { ok: result.ok, msg: result.msg };
-                const tab = result.tab || 'runes';
-                res.writeHead(303, { Location: `./?tab=${encodeURIComponent(tab)}&flash=${encodeURIComponent(flash.msg)}&ok=${flash.ok ? '1' : '0'}` });
+                const tab = ['runes', 'shop', 'inventory'].includes(result.tab) ? result.tab : 'runes';
+                const location = `/p/${token}?tab=${tab}&flash=${encodeURIComponent(result.msg)}&ok=${result.ok ? '1' : '0'}`;
+                res.writeHead(303, { Location: location });
                 res.end();
                 return;
             }
 
-            if (viewMatch && req.method !== 'GET') {
+            if (req.method !== 'GET') {
                 res.writeHead(405, { Allow: 'GET', 'Cache-Control': 'no-store' });
                 res.end();
                 return;
             }
 
-            const tabParam = String(url.searchParams.get('tab') || '');
-            const tab = ['you', 'runes', 'shop', 'inventory'].includes(tabParam) ? tabParam : '';
+            const rawTab = String(url.searchParams.get('tab') || '');
+            const tab = ['runes', 'shop', 'inventory'].includes(rawTab) || rawTab === 'you'
+                ? (rawTab === 'you' ? 'runes' : rawTab) : 'profile';
             const flashParam = url.searchParams.get('flash');
-            if (flashParam) flash = { ok: url.searchParams.get('ok') !== '0', msg: flashParam };
+            const flash = flashParam ? { ok: url.searchParams.get('ok') !== '0', msg: flashParam } : null;
 
             const view = await buildProfileView(client, resolved.guildId, resolved.userId);
-            let content = '';
-            if (tab) {
+            let content;
+            if (tab === 'profile') {
+                content = profileContent(view, token);
+            } else {
                 const data = await buildYouData(client, resolved.guildId, resolved.userId);
-                content = renderYou(data, tab === 'you' ? 'runes' : tab, flash);
+                content = renderYou(data, tab, token);
             }
+
             res.writeHead(200, {
                 'Content-Type': 'text/html; charset=utf-8',
                 'Cache-Control': 'no-store',
                 'X-Content-Type-Options': 'nosniff',
                 'Referrer-Policy': 'no-referrer'
             });
-            res.end(renderHtml(view, { tab: tab ? 'you' : '', content }));
+            res.end(page({ token, view, tab, flash, content }));
         } catch (err) {
             console.error('[profile-web] request failed:', err);
             res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-            res.end('<!doctype html><html><body style="background:#0b1020;color:#fff;font-family:system-ui;padding:24px"><h1>500</h1><p>Something went wrong.</p></body></html>');
+            res.end('<!doctype html><html><body style="background:#080c18;color:#fff;font-family:system-ui;padding:24px"><h1>500</h1><p>Something went wrong.</p></body></html>');
         }
     });
 
-    server.on('error', (err) => {
-        console.error('[profile-web] server error:', err);
-    });
-
-    server.listen(port, '0.0.0.0', () => {
-        console.log(`[profile-web] listening on :${port} (base ${baseUrl})`);
-    });
-
+    server.on('error', (err) => console.error('[profile-web] server error:', err));
+    server.listen(port, '0.0.0.0', () => console.log(`[profile-web] listening on :${port} (base ${baseUrl})`));
     return server;
 }
 
-module.exports = {
-    startProfileWeb,
-    getProfileWebUrl,
-    getProfileWebConfig,
-    buildProfileView
-};
+module.exports = { startProfileWeb, getProfileWebUrl, getProfileWebConfig, buildProfileView };
