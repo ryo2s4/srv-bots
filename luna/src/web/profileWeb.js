@@ -280,7 +280,7 @@ function startProfileWeb(client) {
             }
 
             const tabParam = String(url.searchParams.get('tab') || '');
-            const tab = ['runes', 'shop', 'inventory'].includes(tabParam) ? tabParam : '';
+            const tab = ['you', 'runes', 'shop', 'inventory'].includes(tabParam) ? tabParam : '';
             const flashParam = url.searchParams.get('flash');
             if (flashParam) flash = { ok: url.searchParams.get('ok') !== '0', msg: flashParam };
 
@@ -288,7 +288,7 @@ function startProfileWeb(client) {
             let content = '';
             if (tab) {
                 const data = await buildYouData(client, resolved.guildId, resolved.userId);
-                content = renderYou(data, tab, flash);
+                content = renderYou(data, tab === 'you' ? 'runes' : tab, flash);
             }
             res.writeHead(200, {
                 'Content-Type': 'text/html; charset=utf-8',
