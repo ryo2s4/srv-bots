@@ -195,7 +195,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
                 : { q: 'كم عدد الكواكب في المجموعة الشمسية؟', correct: '8', opts: ['8', '9', '7', '10'] };
         }
         const options = Array.isArray(t.opts) && t.opts.length >= 2
-            ? t.opts.slice(0, 4)
+            ? [...t.opts.slice(0, 4)].sort(() => Math.random() - 0.5)
             : [t.correct, 'إجابة أخرى'];
         const eventType = type === 'baccalaureate' ? 'baccalaureate' : 'trivia';
         state = {
