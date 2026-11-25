@@ -198,14 +198,17 @@ input:focus,select:focus{border-color:var(--accent-dim)}
 .rune-row{position:relative}
 .status-tag{display:inline-block;border:1px solid var(--line);color:var(--muted);border-radius:5px;padding:2px 9px;font-size:13px;transition:color .2s,border-color .2s,background .2s}
 .status-tag.on{color:var(--accent);border-color:var(--accent-dim);background:#efe0c8}
-.stat-num{color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums}
+.stat-num{color:var(--accent);font-weight:800;font-size:17px;font-variant-numeric:tabular-nums}
 .rune-row.row-out{animation:rowOut .4s ease both}
-@keyframes rowOut{to{opacity:0;transform:translateX(14px)}}
-.money-fx{position:fixed;z-index:80;pointer-events:none;display:flex;align-items:center;gap:5px;font-family:Georgia,"Times New Roman",serif;font-size:16px;font-weight:700;color:var(--gold);text-shadow:0 1px 0 #fff8ec}
+@keyframes rowOut{to{opacity:0;transform:translateX(28px) scale(.9)}}
+.money-fx{position:fixed;z-index:80;pointer-events:none;display:flex;align-items:center;gap:6px;font-family:Georgia,"Times New Roman",serif;font-size:19px;font-weight:700;color:var(--gold);text-shadow:0 1px 0 #fff8ec}
 .money-fx.neg{color:var(--danger)}
-.rune-stamp{position:absolute;inset-inline-start:50%;top:50%;transform:translate(-50%,-50%);z-index:5;pointer-events:none;border:2px solid var(--accent);color:var(--accent);background:#faf4e8f2;border-radius:6px;padding:6px 12px;font-family:Georgia,"Times New Roman",serif;font-size:15px;font-weight:700;letter-spacing:1.5px;white-space:nowrap}
+.coin-trail{position:fixed;width:7px;height:7px;border-radius:50%;background:var(--gold);z-index:79;pointer-events:none;box-shadow:0 0 0 2px #fff8ec}
+.coin-trail.neg{background:var(--danger)}
+.burst-ring{position:absolute;inset-inline-start:50%;top:50%;width:80px;height:80px;margin:0;transform:translate(-50%,-50%);border:2px solid var(--accent);border-radius:50%;pointer-events:none;z-index:4}
+.rune-stamp{position:absolute;inset-inline-start:50%;top:50%;transform:translate(-50%,-50%);z-index:5;pointer-events:none;border:3px solid var(--accent);color:var(--accent);background:#faf4e8f7;border-radius:6px;padding:8px 16px;font-family:Georgia,"Times New Roman",serif;font-size:18px;font-weight:700;letter-spacing:2px;white-space:nowrap;box-shadow:0 6px 18px rgba(59,47,36,.18)}
 .rune-stamp.good{border-color:var(--gold);color:var(--gold)}
-.confetti-piece{position:fixed;width:7px;height:11px;z-index:70;pointer-events:none;border-radius:1px}
+.confetti-piece{position:fixed;width:9px;height:14px;z-index:70;pointer-events:none;border-radius:1px}
 .inline-error{color:var(--danger);font-size:13px;margin-inline-start:8px}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
