@@ -203,7 +203,7 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
             roundIndex, roundTotal, done, _resolveDone: resolveDone,
             messageId: null, prize: Number(c.prizePoints) || 100, gift,
             description: `${t.q}\n\n${titlePrefix} — أول إجابة صحيحة تفوز!`,
-            correct: t.correct, entrants: new Set(), finished: false, endsAt: Date.now() + 90_000
+            correct: t.correct, entrants: new Set(), attempted: new Set(), finished: false, endsAt: Date.now() + 90_000
         };
         const row = new ActionRowBuilder().addComponents(
             ...options.map((opt, i) => new ButtonBuilder()
@@ -296,17 +296,20 @@ async function handleFunButton(interaction) {
         } catch { /* ignore */ }
         return true;
     }
-    // trivia
-    const choice = state.options[Number(parts[3]) || 0];
-    if (state.entrants.size && state.entrants.has(interaction.user.id)) {
-        return interaction.reply({ content: 'شاركت بالفعل 3:', flags: MessageFlags.Ephemeral }).catch(() => {});
+    // trivia / baccalaureate
+    const uid = String(interaction.user.id);
+    const attempted = state.attempted instanceof Set ? state.attempted : (state.attempted = new Set());
+    if (attempted.has(uid)) {
+        return interaction.reply({ content: '⚠️ جربت بالفعل — لكل عضو محاولة وحدة بس 3:', flags: MessageFlags.Ephemeral }).catch(() => {});
     }
+    attempted.add(uid);
+    const choice = state.options[Number(parts[3]) || 0];
     if (choice === state.correct) {
-        state.entrants.add(interaction.user.id);
-        await finish(state, interaction.user.id);
+        state.entrants.add(uid);
+        await finish(state, uid);
         try { await interaction.reply({ content: '✅ إجابة صحيحة — مبروك!', flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
     } else {
-        try { await interaction.reply({ content: '❌ غلط، جرّب حد ثاني!', flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
+        try { await interaction.reply({ content: '❌ غلط! كانت عندك محاولة وحدة بس.', flags: MessageFlags.Ephemeral }); } catch { /* ignore */ }
     }
     return true;
 }
