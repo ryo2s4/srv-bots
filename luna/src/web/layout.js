@@ -335,7 +335,10 @@ input:focus,select:focus{border-color:var(--accent-dim)}
             if(oldEl)oldStats=oldEl.textContent;
           }
           try{
-            var res=await fetch(f.action,{method:'POST',body:new FormData(f),headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
+            var body=new URLSearchParams();
+            var fd=new FormData(f);
+            fd.forEach(function(value,key){ body.append(key,value); });
+            var res=await fetch(f.action,{method:'POST',body:body,headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
             var data=await res.json();
             if(!data.ok){ toast(data.msg,false); if(btn)btn.disabled=false; return; }
             money(data.balanceAfter-data.balanceBefore);

@@ -197,6 +197,7 @@ function fail(msg, tab, extra = {}) { return { ok: false, msg, tab, ...extra }; 
 async function handleAction(client, guildId, userId, form) {
  const action = String(form.get('action') || '');
  const tab = String(form.get('tab') || 'runes');
+ if (!action) return fail('Invalid request: missing action.', 'runes');
  const inv = getUserInventory(guildId, userId);
  const allRunes = Array.isArray(inv.runes) ? inv.runes : [];
 
