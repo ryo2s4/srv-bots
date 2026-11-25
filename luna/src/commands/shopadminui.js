@@ -32,7 +32,9 @@ module.exports = {
                 '> 📝 **تعديل وصف**: اختيار عنصر وتغيير وصفه',
                 '> 🗑️ **حذف عنصر**: اختيار من قائمة',
                 '> 🏆 **تفعيل/إيقاف المزاد**',
-                '> 🎖️ **تعيين رتبة المزاد الأسطوري**'
+                '> 🎖️ **تعيين رتبة المزاد الأسطوري**',
+                '> 🎟️ **كود خصم**: إنشاء كود خصم (1-20%)',
+                '> ♻️ **تصفير كوبون**: إعادة استخدام كوبون خلصت استخداماته'
             ].join('\n'),
             footerText: `طلبه: ${interaction.user.tag}`
         });
@@ -52,7 +54,8 @@ module.exports = {
 
         const row3 = UI.row(
             UI.btn('shopadminui:show', 'عرض الإعدادات ⚙️', { style: ButtonStyle.Secondary }),
-            UI.btn('shopadminui:add_coupon', 'كود خصم 🎟️', { style: ButtonStyle.Secondary })
+            UI.btn('shopadminui:add_coupon', 'كود خصم 🎟️', { style: ButtonStyle.Secondary }),
+            UI.btn('shopadminui:reset_coupon', 'تصفير كوبون ♻️', { style: ButtonStyle.Secondary })
         );
 
         const row4 = UI.row(

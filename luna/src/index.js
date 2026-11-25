@@ -395,7 +395,8 @@ function getActiveDiscount(guildId, userId) {
 
 function applyDiscount(cost, percent) {
     const c = Math.max(1, Math.floor(Number(cost) || 0));
-    const p = Math.max(0, Math.min(20, Math.floor(Number(percent) || 0)));
+    // الخصم الكلي = خصم اليومي/أول شراء + الكوبون، بحد أقصى 80% حتى لا يصير السعر صفر
+    const p = Math.max(0, Math.min(80, Math.floor(Number(percent) || 0)));
     return Math.max(1, Math.floor(c * (100 - p) / 100));
 }
 
@@ -419,6 +420,8 @@ function getPendingCoupon(guildId, userId, itemId) {
 
     const c = shop.coupons && typeof shop.coupons === 'object' ? shop.coupons[code] : null;
     if (!c) return { code: null, percent: 0 };
+    const expAt = Number(c.expiresAt) || 0;
+    if (expAt && Date.now() >= expAt) return { code: null, percent: 0 };
     const maxUses = Math.max(0, Math.floor(Number(c.maxUses) || 0));
     const used = Math.max(0, Math.floor(Number(c.used) || 0));
     if (maxUses > 0 && used >= maxUses) return { code: null, percent: 0 };

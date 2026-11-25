@@ -391,6 +391,31 @@ async function handleShopAdminButtons({ interaction }) {
         return true;
     }
 
+    if (action === 'reset_coupon') {
+        const shop = getGuildShop(interaction.guild.id);
+        const coupons = shop.coupons && typeof shop.coupons === 'object' ? Object.entries(shop.coupons) : [];
+        if (coupons.length === 0) {
+            try { await interaction.reply({ content: '❌ ما فيه كوبونات مسجلة حاليًا.', ephemeral: true }); } catch { }
+            return true;
+        }
+
+        const options = coupons.slice(0, 25).map(([code, c]) => {
+            const maxUses = Math.max(0, Math.floor(Number(c.maxUses) || 0));
+            const used = Math.max(0, Math.floor(Number(c.used) || 0));
+            return {
+                label: code.slice(0, 100),
+                description: `${Math.max(0, Math.floor(Number(c.percent) || 0))}% — مستخدم ${used}${maxUses > 0 ? `/${maxUses}` : ''}`.slice(0, 100),
+                value: code
+            };
+        });
+
+        const row = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder().setCustomId('shopadminuiSelect:reset_coupon').setPlaceholder('اختار كوبون لتصفير استخداماته').addOptions(options)
+        );
+        try { await interaction.reply({ content: '♻️ تصفير كوبون\nاختار الكوبون من القائمة 👇', components: [row], ephemeral: true }); } catch { }
+        return true;
+    }
+
     if (action === 'edit_desc') {
         const shop = getGuildShop(interaction.guild.id);
         const roles = Array.isArray(shop.roleItems) ? shop.roleItems : [];
@@ -538,6 +563,17 @@ async function handleShopAdminButtons({ interaction }) {
         const titleCount = Array.isArray(shop.titleItems) ? shop.titleItems.length : 0;
         const legendary = shop.auction && shop.auction.legendaryRoleId ? `<@&${shop.auction.legendaryRoleId}>` : 'غير محددة';
         const status = shop.auction && shop.auction.active ? 'نشط ✅' : 'غير نشط ⛔';
+        const coupons = shop.coupons && typeof shop.coupons === 'object' ? Object.entries(shop.coupons) : [];
+        const couponLines = coupons.length
+            ? coupons.slice(0, 10).map(([code, c]) => {
+                const maxUses = Math.max(0, Math.floor(Number(c.maxUses) || 0));
+                const used = Math.max(0, Math.floor(Number(c.used) || 0));
+                const exp = Number(c.expiresAt) || 0;
+                const expTxt = exp ? (Date.now() >= exp ? ' — منتهي ⌛' : ` — ينتهي <t:${Math.floor(exp / 1000)}:R>`) : '';
+                const usesTxt = maxUses > 0 ? `${used}/${maxUses}` : `${used}/∞`;
+                return `> 🎟️ **${code}** — ${Math.max(0, Math.floor(Number(c.percent) || 0))}% — ${usesTxt}${expTxt}`;
+            }).join('\n')
+            : '> 🎟️ **الكوبونات:** ما فيه ولا كود';
         try {
             await interaction.reply({
                 embeds: [
@@ -549,7 +585,10 @@ async function handleShopAdminButtons({ interaction }) {
                             `> 🎭 **ألقاب بالمتجر:** ${UI.fmtNum(titleCount)}`,
                             `> 🏆 **رتبة المزاد الأسطوري:** ${legendary}`,
                             `> 📌 **حالة المزاد:** ${status}`,
-                            `> 📢 **إعلانات العروض:** ${(() => { try { const c = require('../guildConfig').getGuildConfig(interaction.guild.id); const s = c.shop && typeof c.shop === 'object' ? c.shop : {}; return s.announceEnabled ? `مفعّلة ✅ ${s.announceChannelId ? `<#${s.announceChannelId}>` : ''}` : 'معطّلة ⛔'; } catch { return '—'; } })()}`
+                            `> 📢 **إعلانات العروض:** ${(() => { try { const c = require('../guildConfig').getGuildConfig(interaction.guild.id); const s = c.shop && typeof c.shop === 'object' ? c.shop : {}; return s.announceEnabled ? `مفعّلة ✅ ${s.announceChannelId ? `<#${s.announceChannelId}>` : ''}` : 'معطّلة ⛔'; } catch { return '—'; } })()}`,
+                            '',
+                            '**🎟️ كوبونات الخصم:**',
+                            couponLines
                         ].join('\n'),
                         footerText: 'إعدادات المتجر'
                     })
@@ -584,6 +623,40 @@ async function handleShopAdminSelectRemove({ interaction }) {
     });
 
     try { await interaction.reply({ content: `✅ 🗑️ تم حذف العنصر: **${id}**`, ephemeral: true }); } catch { }
+    return true;
+}
+
+async function handleShopAdminSelectResetCoupon({ interaction }) {
+    if (!(interaction.isStringSelectMenu && interaction.isStringSelectMenu())) return false;
+    if (interaction.customId !== 'shopadminuiSelect:reset_coupon') return false;
+
+    if (!interaction.guild) return true;
+    if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionsBitField.Flags.ManageGuild)) {
+        try { await interaction.reply({ content: '❌ آسف بس تحتاج صلاحية Manage Server عشان تستخدم هالامر 3:', ephemeral: true }); } catch { }
+        return true;
+    }
+
+    const code = interaction.values && interaction.values[0] ? interaction.values[0] : null;
+    if (!code) return true;
+
+    let found = false;
+    updateGuildShop(interaction.guild.id, (g) => {
+        const next = { ...g };
+        next.coupons = next.coupons && typeof next.coupons === 'object' ? { ...next.coupons } : {};
+        const cur = next.coupons[code];
+        if (cur && typeof cur === 'object') {
+            found = true;
+            next.coupons[code] = { ...cur, used: 0 };
+        }
+        return next;
+    });
+
+    if (!found) {
+        try { await interaction.reply({ content: '❌ ما لقيت هالكوبون… يمكن انحذف 3:', ephemeral: true }); } catch { }
+        return true;
+    }
+
+    try { await interaction.reply({ content: `✅ ♻️ تم تصفير استخدامات الكوبون **${code}** — صار جاهز من جديد.`, ephemeral: true }); } catch { }
     return true;
 }
 
@@ -1282,10 +1355,10 @@ async function handleShopSelect({ interaction }) {
 
     const discount = getActiveDiscount(interaction.guild.id, interaction.user.id);
     const coupon = getPendingCoupon(interaction.guild.id, interaction.user.id, itemId);
-    const totalPercent = Math.min(20, discount.percent + (coupon.percent || 0));
+    const totalPercent = Math.min(80, discount.percent + (coupon.percent || 0));
     const finalCost = applyDiscount(item.price, totalPercent);
     const afterBalance = points - finalCost;
-    const discTxt = discount.percent > 0
+    const discTxt = totalPercent > 0
         ? `\n\n> 🎟️ **خصمك:** ${totalPercent}% (اليومي ${discount.base}% + أول شراء ${discount.first}%${coupon.code ? ` + كود ${coupon.code} (${coupon.percent}%)` : ''})`
         : '';
 
@@ -1377,6 +1450,11 @@ async function handleShopCouponModal({ interaction }) {
         try { await interaction.reply({ content: '❌ 🌙 الكود هذا غير موجود.', ephemeral: true }); } catch { }
         return true;
     }
+    const expAt = Number(c.expiresAt) || 0;
+    if (expAt && Date.now() >= expAt) {
+        try { await interaction.reply({ content: '❌ ⌛ هذا الكود انتهت صلاحيته.', ephemeral: true }); } catch { }
+        return true;
+    }
     const percent = Math.max(0, Math.min(20, Math.floor(Number(c.percent) || 0)));
     if (!percent) {
         try { await interaction.reply({ content: '❌ 🌙 الكود هذا غير صالح.', ephemeral: true }); } catch { }
@@ -1401,6 +1479,22 @@ async function handleShopCouponModal({ interaction }) {
         return next;
     });
 
+    const remainingUses = maxUses > 0 ? Math.max(0, maxUses - used) : null;
+    const activeDiscount = getActiveDiscount(interaction.guild.id, interaction.user.id);
+    const totalPercent = Math.min(80, activeDiscount.percent + percent);
+
+    // الرد أولًا حتى لا تنتهي مهلة التفاعل (3 ثواني) أثناء إرسال اللوق
+    try {
+        await interaction.reply({
+            content: [
+                `✅ 🌙 تم تطبيق الكود **${code}** — خصم **${percent}%**${remainingUses !== null ? ` (متبقي ${UI.fmtNum(remainingUses)} استخدام)` : ''}.`,
+                `> 🧮 **إجمالي خصمك الآن:** ${totalPercent}%${activeDiscount.percent > 0 ? ` (اليومي ${activeDiscount.base}% + أول شراء ${activeDiscount.first}%)` : ''}`,
+                '> 🛒 كمل الشراء من نفس المنتج.'
+            ].join('\n'),
+            ephemeral: true
+        });
+    } catch { }
+
     try {
         const logEmbed = UI.embed({
             color: UI.COLORS.logs,
@@ -1408,7 +1502,8 @@ async function handleShopCouponModal({ interaction }) {
             description: [
                 `${interaction.user} طبّق كود **${code}** على المنتج: **${String(itemId).slice(0, 120)}**`,
                 '',
-                `> 🎟️ **نسبة الخصم:** ${percent}%`
+                `> 🎟️ **نسبة الخصم:** ${percent}%`,
+                `> 🧮 **الإجمالي:** ${totalPercent}%`
             ].join('\n'),
             footerText: 'سجل المتجر'
         });
@@ -1416,7 +1511,6 @@ async function handleShopCouponModal({ interaction }) {
     } catch {
     }
 
-    try { await interaction.reply({ content: `✅ 🌙 تم تطبيق الكود **${code}** (${percent}%). كمل الشراء من نفس المنتج.`, ephemeral: true }); } catch { }
     return true;
 }
 
@@ -1453,7 +1547,7 @@ async function handleShopBuyButton({ interaction }) {
     const coupon = getPendingCoupon(interaction.guild.id, interaction.user.id, itemId);
     const baseCost = Math.max(1, Math.floor(Number(item.price) || 0));
 
-    const totalPercent = Math.min(20, discount.percent + (coupon.percent || 0));
+    const totalPercent = Math.min(80, discount.percent + (coupon.percent || 0));
     const cost = applyDiscount(baseCost, totalPercent);
     const spend = spendLunaPoints(interaction.guild.id, interaction.user.id, cost);
     if (!spend.ok) {
@@ -1569,7 +1663,7 @@ async function handleShopGiftModal({ interaction }) {
     const discount = getActiveDiscount(interaction.guild.id, interaction.user.id);
     const coupon = getPendingCoupon(interaction.guild.id, interaction.user.id, itemId);
     const baseCost = Math.max(1, Math.floor(Number(item.price) || 0));
-    const totalPercent = Math.min(20, discount.percent + (coupon.percent || 0));
+    const totalPercent = Math.min(80, discount.percent + (coupon.percent || 0));
     const cost = applyDiscount(baseCost, totalPercent);
     const spend = spendLunaPoints(interaction.guild.id, interaction.user.id, cost);
     if (!spend.ok) return respond({ content: '❌ رصيدك ما يكفي للإهداء 😢' });
@@ -1735,6 +1829,7 @@ async function handleShopHistoryButton({ interaction }) {
 async function handle({ client, interaction }) {
     if (await handleShopAdminButtons({ interaction })) return true;
     if (await handleShopAdminSelectRemove({ interaction })) return true;
+    if (await handleShopAdminSelectResetCoupon({ interaction })) return true;
     if (await handleShopAdminSelectEditDesc({ interaction })) return true;
     if (await handleShopAdminModal({ interaction })) return true;
 
