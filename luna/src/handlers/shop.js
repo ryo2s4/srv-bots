@@ -1888,4 +1888,13 @@ async function handle({ client, interaction }) {
     return false;
 }
 
-module.exports = { handle };
+module.exports = {
+    handle,
+    // Shared with the web profile UI so both surfaces use identical shop logic.
+    grantItemToUser,
+    isUtilityRoleItem,
+    isItemAvailableToday,
+    canUseCooldown,
+    clearPendingCoupon,
+    markFirstBuyDay
+};

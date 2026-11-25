@@ -6,6 +6,8 @@ const { getGuildConfig } = require('../guildConfig');
 const { xpForNextLevel } = require('../xpCurve');
 const { getTotalBoostSummary } = require('../boostMeta');
 const { getTotalRuneSummary } = require('../runes');
+const { buildYouData, handleAction } = require('./youPage');
+const { renderYou } = require('./renderYou');
 
 function esc(s) {
     return String(s ?? '')
@@ -94,7 +96,7 @@ async function buildProfileView(client, guildId, userId) {
     };
 }
 
-function renderHtml(view) {
+function renderHtml(view, opts = {}) {
     const xpPct = Math.max(0, Math.min(100, (view.xp / view.nextXp) * 100));
     const boostRow = (label, icon, value) => `
       <div class="boost">
@@ -133,11 +135,41 @@ function renderHtml(view) {
     .boost-label { color:var(--muted); font-size:13px; display:flex; gap:8px; align-items:center; }
     .boost-value { font-size:24px; font-weight:800; margin-top:8px; }
     .foot { margin-top:22px; color:var(--muted); font-size:12px; text-align:center; }
-    @media (max-width:640px){ .grid,.boosts{grid-template-columns:1fr;} .name{font-size:24px;} .avatar{width:72px;height:72px;border-radius:18px;} }
+    .mainnav,.subnav { display:flex; gap:10px; flex-wrap:wrap; margin:18px 0 4px; }
+    .mainnav a,.subnav a { text-decoration:none; color:var(--muted); background:var(--card2); border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:13px; }
+    .mainnav a.active,.subnav a.active { color:var(--text); border-color:var(--accent); background:rgba(196,167,255,.14); }
+    .panel { background:var(--card2); border:1px solid var(--line); border-radius:18px; padding:16px; margin-top:14px; }
+    .panel h3 { margin:0 0 12px; font-size:15px; color:var(--accent); }
+    .card-row { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:10px 0; border-top:1px solid var(--line); }
+    .card-row:first-of-type { border-top:0; }
+    .row-main { flex:1 1 240px; min-width:0; }
+    .row-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .rune-title { font-weight:700; }
+    .muted { color:var(--muted); font-size:12px; }
+    .price { margin-top:6px; font-size:14px; }
+    .pill { display:inline-block; background:rgba(125,211,252,.14); color:var(--accent2); border-radius:999px; padding:2px 8px; font-size:11px; margin-inline-start:6px; }
+    .balance-bar { background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:12px 16px; margin-top:14px; color:var(--muted); font-size:13px; }
+    .balance-bar b { color:var(--text); }
+    .flash { margin-top:14px; border-radius:14px; padding:12px 16px; font-size:13px; line-height:1.6; }
+    .flash.ok { background:rgba(125,211,252,.10); border:1px solid rgba(125,211,252,.3); color:var(--accent2); }
+    .flash.err { background:rgba(255,120,120,.10); border:1px solid rgba(255,120,120,.3); color:#ffb4b4; }
+    .inline { display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .stack { display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
+    .grid2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .you-content ul { margin:0; padding-inline-start:18px; line-height:1.8; font-size:13px; }
+    input,select { background:#10162a; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font:inherit; font-size:13px; }
+    .btn { cursor:pointer; border:1px solid var(--accent); border-radius:10px; padding:8px 12px; background:var(--accent); color:#15102a; font-weight:700; font-size:13px; }
+    .btn.ghost { background:transparent; color:var(--text); border-color:var(--line); }
+    .btn.danger { background:#e06a6a; border-color:#e06a6a; color:#fff; }
+    @media (max-width:640px){ .grid,.boosts,.grid2{grid-template-columns:1fr;} .name{font-size:24px;} .avatar{width:72px;height:72px;border-radius:18px;} .row-actions{width:100%;} }
   </style>
 </head>
 <body>
   <main class="card">
+    <div class="mainnav">
+      <a class="${opts.tab === 'you' ? '' : 'active'}" href="./">🌙 البروفايل</a>
+      <a class="${opts.tab === 'you' ? 'active' : ''}" href="?tab=you">⚙️ أنت</a>
+    </div>
     <div class="top">
       ${view.avatar ? `<img class="avatar" src="${esc(view.avatar)}" alt="avatar" />` : `<div class="avatar"></div>`}
       <div>
@@ -164,6 +196,8 @@ function renderHtml(view) {
       ${boostRow('Luna', '💰', view.boosts.luna)}
       ${boostRow('Level-Up', '🏅', view.boosts.levelup)}
     </div>
+
+    ${opts.content || ''}
 
     <div class="foot">Luna Profile • هذا الرابط خاص — لا تشاركه إذا ما تبي أحد يشوفه</div>
   </main>
@@ -198,17 +232,29 @@ function startProfileWeb(client) {
         return null;
     }
 
+    const readBody = (req) => new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', (chunk) => {
+            body += chunk;
+            if (body.length > 1024 * 1024) reject(new Error('body too large'));
+        });
+        req.on('end', () => resolve(new URLSearchParams(body)));
+        req.on('error', reject);
+    });
+
     const server = http.createServer(async (req, res) => {
         try {
             const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-            const m = url.pathname.match(/^\/p\/([a-f0-9]{32,128})$/i);
-            if (req.method !== 'GET' || !m) {
+            const actionMatch = url.pathname.match(/^\/p\/([a-f0-9]{32,128})\/action\/?$/i);
+            const viewMatch = url.pathname.match(/^\/p\/([a-f0-9]{32,128})\/?$/i);
+            const matched = actionMatch || viewMatch;
+            if (!matched || (req.method !== 'GET' && req.method !== 'POST')) {
                 res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
                 res.end(notFoundHtml());
                 return;
             }
 
-            const token = m[1];
+            const token = matched[1];
             const resolved = resolveProfileWebToken(token);
             if (!resolved) {
                 res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -216,14 +262,41 @@ function startProfileWeb(client) {
                 return;
             }
 
+            let flash = null;
+            if (actionMatch && req.method === 'POST') {
+                const form = await readBody(req);
+                const result = await handleAction(client, resolved.guildId, resolved.userId, form);
+                flash = { ok: result.ok, msg: result.msg };
+                const tab = result.tab || 'runes';
+                res.writeHead(303, { Location: `./?tab=${encodeURIComponent(tab)}&flash=${encodeURIComponent(flash.msg)}&ok=${flash.ok ? '1' : '0'}` });
+                res.end();
+                return;
+            }
+
+            if (viewMatch && req.method !== 'GET') {
+                res.writeHead(405, { Allow: 'GET', 'Cache-Control': 'no-store' });
+                res.end();
+                return;
+            }
+
+            const tabParam = String(url.searchParams.get('tab') || '');
+            const tab = ['runes', 'shop', 'inventory'].includes(tabParam) ? tabParam : '';
+            const flashParam = url.searchParams.get('flash');
+            if (flashParam) flash = { ok: url.searchParams.get('ok') !== '0', msg: flashParam };
+
             const view = await buildProfileView(client, resolved.guildId, resolved.userId);
+            let content = '';
+            if (tab) {
+                const data = await buildYouData(client, resolved.guildId, resolved.userId);
+                content = renderYou(data, tab, flash);
+            }
             res.writeHead(200, {
                 'Content-Type': 'text/html; charset=utf-8',
                 'Cache-Control': 'no-store',
                 'X-Content-Type-Options': 'nosniff',
                 'Referrer-Policy': 'no-referrer'
             });
-            res.end(renderHtml(view));
+            res.end(renderHtml(view, { tab: tab ? 'you' : '', content }));
         } catch (err) {
             console.error('[profile-web] request failed:', err);
             res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
