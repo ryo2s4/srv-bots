@@ -375,7 +375,12 @@ async function handle({ client, interaction }) {
         if (action === 'add') {
             const modal = new ModalBuilder().setCustomId('adminuiModal:roleboost:add').setTitle('➕ إضافة بوست لرتبة');
             const roleInput = new TextInputBuilder().setCustomId('roleid').setLabel('ID الرتبة').setStyle(TextInputStyle.Short).setRequired(true);
-            const typeInput = new TextInputBuilder().setCustomId('type').setLabel('النوع (xp_boost / luna_boost / levelup_reward_boost)').setStyle(TextInputStyle.Short).setRequired(true);
+            const typeInput = new TextInputBuilder()
+                .setCustomId('type')
+                .setLabel('نوع البوست')
+                .setPlaceholder('xp_boost / luna_boost / levelup_reward_boost')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
             const pctInput = new TextInputBuilder().setCustomId('percent').setLabel('النسبة المئوية (20 = +20%)').setStyle(TextInputStyle.Short).setRequired(true);
             modal.addComponents(new ActionRowBuilder().addComponents(roleInput), new ActionRowBuilder().addComponents(typeInput), new ActionRowBuilder().addComponents(pctInput));
             await interaction.showModal(modal);
