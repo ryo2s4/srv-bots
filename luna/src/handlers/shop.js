@@ -368,16 +368,11 @@ async function handleShopAdminButtons({ interaction }) {
             return true;
         }
 
-        const options = combined.slice(0, 25).map((it) => ({
+        const options = combined.slice(0, 25).map((it, index) => ({
             label: (it.name || it.title || it.id || 'item').slice(0, 100),
             description: `${it.description ? String(it.description).slice(0, 60) : 'بدون وصف'} — ${UI.fmtNum(it.price)}`.slice(0, 100),
-            value: it.id
-        })).filter((o) => o.value);
-
-        if (options.length === 0) {
-            try { await interaction.reply({ content: '❌ ما قدرت أجهّز قائمة العناصر… تأكد من البيانات 3:', ephemeral: true }); } catch { }
-            return true;
-        }
+            value: String(index)
+        }));
 
         const row = new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder().setCustomId('shopadminuiSelect:edit_desc').setPlaceholder('اختار عنصر لتعديل وصفه').addOptions(options)
@@ -570,14 +565,16 @@ async function handleShopAdminSelectEditDesc({ interaction }) {
     }
 
     const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
-    const id = interaction.values && interaction.values[0] ? interaction.values[0] : null;
-    if (!id) return true;
+    const rawIndex = interaction.values && interaction.values[0] ? interaction.values[0] : null;
+    const index = Number(rawIndex);
+    if (!Number.isInteger(index) || index < 0) return true;
 
     const shop = getGuildShop(interaction.guild.id);
-    const item = [
+    const combined = [
         ...(Array.isArray(shop.roleItems) ? shop.roleItems : []),
         ...(Array.isArray(shop.titleItems) ? shop.titleItems : [])
-    ].find((x) => x && x.id === id);
+    ].filter(Boolean);
+    const item = combined[index];
 
     if (!item) {
         try { await interaction.reply({ content: '❌ ما لقيت هالعنصر… يمكن انحذف 3:', ephemeral: true }); } catch { }
@@ -585,7 +582,7 @@ async function handleShopAdminSelectEditDesc({ interaction }) {
     }
 
     const modal = new ModalBuilder()
-        .setCustomId(`shopadminuiModal:edit_desc:${encodeURIComponent(id)}`)
+        .setCustomId(`shopadminuiModal:edit_desc:${index}`)
         .setTitle('تعديل وصف العنصر 📝');
 
     const desc = new TextInputBuilder()
@@ -614,12 +611,25 @@ async function handleShopAdminModal({ interaction }) {
     const action = interaction.customId.split(':')[1];
 
     if (action === 'edit_desc') {
-        const itemId = decodeURIComponent(interaction.customId.split(':').slice(2).join(':') || '');
-        if (!itemId) {
+        const rawIndex = interaction.customId.split(':').slice(2).join(':');
+        const index = Number(rawIndex);
+        if (!Number.isInteger(index) || index < 0) {
             try { await interaction.reply({ content: '❌ تعذر تحديد العنصر 3:', ephemeral: true }); } catch { }
             return true;
         }
 
+        const shop = getGuildShop(interaction.guild.id);
+        const combined = [
+            ...(Array.isArray(shop.roleItems) ? shop.roleItems : []),
+            ...(Array.isArray(shop.titleItems) ? shop.titleItems : [])
+        ].filter(Boolean);
+        const item = combined[index];
+        if (!item) {
+            try { await interaction.reply({ content: '❌ ما لقيت هالعنصر… يمكن انحذف 3:', ephemeral: true }); } catch { }
+            return true;
+        }
+
+        const itemId = item.id;
         const raw = interaction.fields.getTextInputValue('description');
         const description = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 200);
 
