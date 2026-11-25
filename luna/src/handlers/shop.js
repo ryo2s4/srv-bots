@@ -89,6 +89,39 @@ function getItemById(guildId, itemId) {
     return { shop, item };
 }
 
+// مرجع قصير للعنصر داخل custom_id (حد ديسكورد 100 حرف، والمعرّفات العربية تتضخم بالترميز)
+function encodeItemRef(guildId, itemId) {
+    const shop = getGuildShop(guildId);
+    const combined = [
+        ...(Array.isArray(shop.roleItems) ? shop.roleItems : []),
+        ...(Array.isArray(shop.titleItems) ? shop.titleItems : [])
+    ].filter(Boolean);
+    const index = combined.findIndex((x) => x && x.id === itemId);
+    if (index >= 0) return `i:${index}`;
+    return `s:${encodeURIComponent(itemId)}`;
+}
+
+function decodeItemRef(guildId, ref) {
+    const raw = String(ref || '');
+    const mode = raw.slice(0, 1);
+    const payload = raw.slice(2);
+    if (mode === 'i') {
+        const index = Number(payload);
+        if (!Number.isInteger(index) || index < 0) return null;
+        const shop = getGuildShop(guildId);
+        const combined = [
+            ...(Array.isArray(shop.roleItems) ? shop.roleItems : []),
+            ...(Array.isArray(shop.titleItems) ? shop.titleItems : [])
+        ].filter(Boolean);
+        return combined[index] ? combined[index].id : null;
+    }
+    if (mode === 's') {
+        try { return decodeURIComponent(payload); } catch { return payload; }
+    }
+    // توافق مع الصيغة القديمة (معرّف مُرمّز بالكامل)
+    try { return decodeURIComponent(raw); } catch { return raw || null; }
+}
+
 // هل العنصر متاح للبيع اليوم؟
 // - العناصر الثابتة دائمًا متاحة، ما عدا المحدودة (kind: 'limited') لأنها تنباع فقط عبر سطح "العنصر المحدود" اليومي
 // - الكتالوج (roleItems/titleItems) دائمًا متاح (كتالوج دائم)
@@ -1313,7 +1346,7 @@ async function handleShopCouponButton({ interaction }) {
     const itemId = interaction.customId.slice('shopcoupon:'.length);
     const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 
-    const modal = new ModalBuilder().setCustomId(`shopModal:coupon:${encodeURIComponent(itemId)}`).setTitle('إدخال كود خصم 🎟️');
+    const modal = new ModalBuilder().setCustomId(`shopModal:coupon:${encodeItemRef(interaction.guild.id, itemId)}`).setTitle('إدخال كود خصم 🎟️');
     const code = new TextInputBuilder().setCustomId('code').setLabel('الكود').setStyle(TextInputStyle.Short).setRequired(true);
     modal.addComponents(new ActionRowBuilder().addComponents(code));
 
@@ -1326,7 +1359,11 @@ async function handleShopCouponModal({ interaction }) {
     if (!(typeof interaction.customId === 'string' && interaction.customId.startsWith('shopModal:coupon:'))) return false;
     if (!interaction.guild) return true;
 
-    const itemId = decodeURIComponent(interaction.customId.slice('shopModal:coupon:'.length));
+    const itemId = decodeItemRef(interaction.guild.id, interaction.customId.slice('shopModal:coupon:'.length));
+    if (!itemId) {
+        try { await interaction.reply({ content: '❌ تعذر تحديد العنصر… أعد فتح المتجر 3:', ephemeral: true }); } catch { }
+        return true;
+    }
     const raw = interaction.fields.getTextInputValue('code');
     const code = normalizeCouponCode(raw);
     if (!code) {
@@ -1489,7 +1526,7 @@ async function handleShopGiftButton({ interaction }) {
 
     const itemId = interaction.customId.slice('shopgift:'.length);
     const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
-    const modal = new ModalBuilder().setCustomId(`shopModal:gift:${encodeURIComponent(itemId)}`).setTitle('إهداء عنصر 🎁');
+    const modal = new ModalBuilder().setCustomId(`shopModal:gift:${encodeItemRef(interaction.guild.id, itemId)}`).setTitle('إهداء عنصر 🎁');
     const userId = new TextInputBuilder()
         .setCustomId('userId')
         .setLabel('منشن المستخدم أو ID')
@@ -1509,7 +1546,8 @@ async function handleShopGiftModal({ interaction }) {
         try { return await interaction.reply({ ...payload, ephemeral: true }); } catch { return true; }
     };
 
-    const itemId = decodeURIComponent(interaction.customId.slice('shopModal:gift:'.length));
+    const itemId = decodeItemRef(interaction.guild.id, interaction.customId.slice('shopModal:gift:'.length));
+    if (!itemId) return respond({ content: '❌ تعذر تحديد العنصر… أعد فتح المتجر 3:' });
     const raw = String(interaction.fields.getTextInputValue('userId') || '');
     const m = raw.match(/\d{16,20}/);
     const targetId = m ? String(m[0]) : '';
