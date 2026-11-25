@@ -1,6 +1,6 @@
 const http = require('http');
 const { getOrCreateProfileWebToken, resolveProfileWebToken } = require('../db');
-const { getUserStats } = require('../levelsStore');
+const { getUserStats, getLunaPoints } = require('../levelsStore');
 const { getUserInventory } = require('../shopStore');
 const { getGuildConfig } = require('../guildConfig');
 const { xpForNextLevel } = require('../xpCurve');
@@ -136,8 +136,22 @@ function startProfileWeb(client) {
                     return;
                 }
                 const form = await readBody(req);
+                const balanceBefore = getLunaPoints(resolved.guildId, resolved.userId);
                 const result = await handleAction(client, resolved.guildId, resolved.userId, form);
+                const balanceAfter = getLunaPoints(resolved.guildId, resolved.userId);
                 const tab = ['runes', 'shop', 'inventory'].includes(result.tab) ? result.tab : 'runes';
+                const wantsJson = String(req.headers.accept || '').includes('application/json') || req.headers['x-requested-with'] === 'XMLHttpRequest';
+
+                if (wantsJson) {
+                    const payload = { ...result, tab, balanceBefore, balanceAfter };
+                    if (tab === 'runes' && result.ok) {
+                        payload.html = renderYou(await buildYouData(client, resolved.guildId, resolved.userId), 'runes', token);
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+                    res.end(JSON.stringify(payload));
+                    return;
+                }
+
                 const location = `/p/${token}?tab=${tab}&flash=${encodeURIComponent(result.msg)}&ok=${result.ok ? '1' : '0'}`;
                 res.writeHead(303, { Location: location });
                 res.end();

@@ -2,7 +2,8 @@ const { clean, fmtNum } = require('./youPage');
 const { icon } = require('./icons');
 
 function form(token, action, tab, inner, cls = 'inline') {
-    return `<form class="${cls}" method="post" action="/p/${encodeURIComponent(token)}/action"><input type="hidden" name="action" value="${action}"><input type="hidden" name="tab" value="${tab}">${inner}</form>`;
+    const ajax = action.startsWith('rune_') ? ' data-rune-ajax' : '';
+    return `<form class="${cls}"${ajax} method="post" action="/p/${encodeURIComponent(token)}/action"><input type="hidden" name="action" value="${action}"><input type="hidden" name="tab" value="${tab}">${inner}</form>`;
 }
 
 function btn(label, ico, cls = 'btn') {
@@ -18,10 +19,10 @@ function runeTab(d, token) {
     const fuseOptions = d.runes.map((r) => `<option value="${clean(r.id)}">${clean(r.tier)} ${r.stars > 0 ? `${icon('star', 12)} ${r.stars}` : ''} ${clean(r.boosts)}</option>`).join('');
 
     const rows = d.runes.length ? d.runes.map((r) => `
-      <div class="row">
+      <div class="row rune-row" data-rune-id="${clean(r.id)}">
         <div class="row-main">
-          <div class="row-title">${clean(r.tier)} ${r.stars > 0 ? `<span class="tag gold">${icon('star', 11)} ${r.stars}/${r.cap}</span>` : ''} ${r.equipped ? '<span class="tag">EQUIPPED</span>' : ''}</div>
-          <div class="muted">${clean(r.boosts) || 'No bonuses'} · Sell value ${fmtNum(r.value)}</div>
+          <div class="row-title">${clean(r.tier)} ${r.stars > 0 ? `<span class="tag gold">${icon('star', 11)} ${r.stars}/${r.cap}</span>` : ''} <span class="status-tag ${r.equipped ? 'on' : ''}">${r.equipped ? 'EQUIPPED' : 'UN-EQUIPPED'}</span></div>
+          <div class="muted rune-stats">${clean(r.boosts) || 'No bonuses'} · Sell value ${fmtNum(r.value)}</div>
         </div>
         <div class="row-actions">
           ${form(token, r.equipped ? 'rune_unequip' : 'rune_equip', 'runes', `<input type="hidden" name="runeId" value="${clean(r.id)}">${btn(r.equipped ? 'Unequip' : 'Equip', r.equipped ? 'lock' : 'bolt', 'btn ghost')}`)}
@@ -32,6 +33,7 @@ function runeTab(d, token) {
       </div>`).join('') : '<p class="muted">No runes yet. Buy one below or level up.</p>';
 
     return `
+      <div id="runes-content">
       ${head('gem', 'الرونات', `Equipped ${d.equippedCount}/${d.maxEquipped}`)}
       <div class="panel">
         <h3>${icon('plus', 15)} Buy rune</h3>
@@ -42,7 +44,8 @@ function runeTab(d, token) {
         ${form(token, 'rune_fuse', 'runes', `<select name="runeIds" multiple size="4">${fuseOptions}</select>${btn('Fuse', 'merge', 'btn primary')}`, 'stack')}
         <p class="muted">Select exactly 3 runes (Ctrl / Cmd + click).</p>
       </div>
-      <div class="panel"><h3>${icon('gem', 15)} Your runes <small>${d.runes.length}</small></h3>${rows}</div>`;
+      <div class="panel"><h3>${icon('gem', 15)} Your runes <small>${d.runes.length}</small></h3>${rows}</div>
+      </div>`;
 }
 
 function shopCard(d, it, token) {

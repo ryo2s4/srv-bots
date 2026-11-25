@@ -191,8 +191,8 @@ async function buildYouData(client, guildId, userId) {
  };
 }
 
-function ok(msg, tab) { return { ok: true, msg, tab }; }
-function fail(msg, tab) { return { ok: false, msg, tab }; }
+function ok(msg, tab, extra = {}) { return { ok: true, msg, tab, ...extra }; }
+function fail(msg, tab, extra = {}) { return { ok: false, msg, tab, ...extra }; }
 
 async function handleAction(client, guildId, userId, form) {
  const action = String(form.get('action') || '');
@@ -216,7 +216,10 @@ async function handleAction(client, guildId, userId, form) {
  next.equippedRuneIds = eq;
  return next;
  });
- return ok(action === 'rune_equip' ? ' تم تجهيز الرونة.' : ' تم فك الرونة.', 'runes');
+ const isEquip = action === 'rune_equip';
+ return ok(isEquip ? 'تم تجهيز الرونة.' : 'تم فك الرونة.', 'runes', {
+ fx: isEquip ? 'equip' : 'unequip', runeId: id, status: isEquip ? 'EQUIPPED' : 'UN-EQUIPPED'
+ });
  }
 
  if (action === 'rune_sell') {
@@ -236,7 +239,9 @@ async function handleAction(client, guildId, userId, form) {
  if (!sold) return fail('ما لقيت الرونة 3:', 'runes');
  const value = getRuneValue(sold);
  if (value > 0) addLunaPoints(guildId, userId, value);
- return ok(` تم بيع الرونة — حصلت على ${fmtNum(value)} نقطة.`, 'runes');
+ return ok(`تم بيع الرونة — حصلت على ${fmtNum(value)} نقطة.`, 'runes', {
+ fx: 'sell', runeId: id, amount: value
+ });
  }
 
  if (action === 'rune_buy') {
@@ -255,7 +260,9 @@ async function handleAction(client, guildId, userId, form) {
  return next;
  });
  if (!added) { addLunaPoints(guildId, userId, price); return fail('فشلت العملية، رجّعنا لك النقاط.', 'runes'); }
- return ok(` اشتريت رونة ${TIERS[tier].emoji} ${TIERS[tier].label} — ${runeLine(rune)}`, 'runes');
+ return ok(`اشتريت رونة ${TIERS[tier].label} — ${runeLine(rune)}`, 'runes', {
+ fx: 'buy', runeId: rune.id, after: runeLine(rune)
+ });
  }
 
  if (action === 'rune_upgrade') {
@@ -280,7 +287,10 @@ async function handleAction(client, guildId, userId, form) {
  return next;
  });
  if (!written) { addLunaPoints(guildId, userId, cost); return fail('ما لقينا الرونة، رجّعنا لك النقاط.', 'runes'); }
- return ok(` تمت الترقية إلى ⭐${result.newStars}/${result.cap} — ${runeLine(result.rune)}`, 'runes');
+ return ok(`تمت الترقية إلى ${result.newStars}/${result.cap} نجوم — ${runeLine(result.rune)}`, 'runes', {
+ fx: 'upgrade', runeId: id, before: runeLine(rune), after: runeLine(result.rune),
+ starsBefore: getRuneStars(rune), starsAfter: result.newStars
+ });
  }
 
  if (action === 'rune_fuse') {
@@ -301,7 +311,9 @@ async function handleAction(client, guildId, userId, form) {
  next.equippedRuneIds = (Array.isArray(next.equippedRuneIds) ? next.equippedRuneIds : []).filter((x) => !consumed.has(x));
  return next;
  });
- return ok(` تم دمج 3 رونات — الناتج: ${runeLine(result.rune)}`, 'runes');
+ return ok(`تم دمج 3 رونات — الناتج: ${runeLine(result.rune)}`, 'runes', {
+ fx: 'fuse', runeId: result.rune.id, after: runeLine(result.rune), consumedIds: ids
+ });
  }
 
  if (action === 'rune_reroll') {
@@ -322,7 +334,9 @@ async function handleAction(client, guildId, userId, form) {
  next.runes = list;
  return next;
  });
- return ok(` تم إعادة تدوير الرونة — ${runeLine(result.rune)}`, 'runes');
+ return ok(`تم إعادة تدوير الرونة — ${runeLine(result.rune)}`, 'runes', {
+ fx: 'reroll', runeId: id, before: runeLine(rune), after: runeLine(result.rune)
+ });
  }
 
  if (action === 'shop_buy' || action === 'shop_gift') {

@@ -193,6 +193,32 @@ input:focus,select:focus{border-color:var(--accent-dim)}
 .eyebrow{letter-spacing:3px}
 .foot{font-family:Georgia,"Times New Roman",serif;font-style:italic;letter-spacing:.4px}
 .side-foot{font-family:Georgia,"Times New Roman",serif;font-style:italic}
+/* rune action effects */
+.status-tag{display:inline-block;border:1px solid var(--line);color:var(--muted);border-radius:5px;padding:1px 7px;font-size:10px;transition:color .2s,border-color .2s,background .2s}
+.status-tag.on{color:var(--accent);border-color:var(--accent-dim);background:#efe0c8}
+.status-tag.pop{animation:tagPop .5s ease}
+.rune-row.changing{animation:rowPulse .9s ease}
+.rune-row .rune-stats{transition:color .3s}
+.stat-old{color:var(--muted);text-decoration:line-through}
+.stat-arrow{color:var(--accent);margin:0 6px}
+.stat-new{color:var(--accent);font-weight:700}
+.rune-row.stat-change{animation:statSwap 1.1s ease}
+.rune-row.row-in{animation:rowIn .55s ease both}
+.rune-row.row-out{animation:rowOut .4s ease both}
+.money-fly{position:fixed;z-index:60;pointer-events:none;font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--gold);animation:moneyFloat 1.15s ease-out forwards;text-shadow:0 1px 0 #fff8ec}
+.money-fly.neg{color:var(--danger)}
+.fx-toast{position:fixed;inset-inline-end:20px;bottom:20px;z-index:70;max-width:min(360px,calc(100vw - 40px));border:1px solid var(--accent-dim);background:var(--panel);color:var(--text);border-radius:var(--radius);padding:11px 14px;font-size:12px;box-shadow:0 8px 24px rgba(59,47,36,.14);animation:toastIn .28s ease both}
+.fx-toast.err{border-color:#d3a9a1;color:var(--danger)}
+.confetti-piece{position:fixed;top:-12px;width:7px;height:11px;z-index:80;pointer-events:none;animation:confettiFall var(--dur) linear forwards;border-radius:1px}
+@keyframes tagPop{0%{transform:scale(.7);opacity:.3}60%{transform:scale(1.14)}100%{transform:scale(1);opacity:1}}
+@keyframes rowPulse{0%{background:transparent}30%{background:#efe0c8}100%{background:transparent}}
+@keyframes statSwap{0%{transform:translateY(0)}25%{transform:translateY(-3px);opacity:.55}55%{transform:translateY(2px);opacity:1}100%{transform:translateY(0)}}
+@keyframes rowIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes rowOut{to{opacity:0;transform:translateX(12px)}}
+@keyframes moneyFloat{0%{opacity:0;transform:translateY(6px)}20%{opacity:1}100%{opacity:0;transform:translateY(-34px)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes confettiFall{to{transform:translateY(105vh) rotate(var(--spin));opacity:.9}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
@@ -216,6 +242,129 @@ input:focus,select:focus{border-color:var(--accent-dim)}
   ${content}
   <div class="foot">Luna Profile — changes sync with Discord instantly</div>
 </main>
+<script>
+(function(){
+  var audioCtx=null;
+  function audio(){
+    if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+    return audioCtx;
+  }
+  function tone(freq,delay,dur,type){
+    var c=audio(); if(!c)return;
+    var o=c.createOscillator(),g=c.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(0.0001,c.currentTime+delay);
+    g.gain.exponentialRampToValueAtTime(0.08,c.currentTime+delay+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+delay+dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime+delay); o.stop(c.currentTime+delay+dur+0.03);
+  }
+  function sound(kind){
+    if(kind==='fuse'){ tone(330,0,0.16,'triangle'); tone(440,0.12,0.18,'triangle'); tone(660,0.26,0.28,'sine'); }
+  }
+  function toast(msg,ok){
+    var t=document.createElement('div');
+    t.className='fx-toast'+(ok?'':' err'); t.textContent=msg;
+    document.body.appendChild(t);
+    setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(function(){t.remove();},320); },2600);
+  }
+  function money(delta){
+    if(!delta)return;
+    var chip=document.querySelector('.chip.gold')||document.body;
+    var r=chip.getBoundingClientRect();
+    var el=document.createElement('div');
+    el.className='money-fly'+(delta<0?' neg':'');
+    el.textContent=(delta>0?'+':'')+delta;
+    el.style.left=(r.left+10)+'px'; el.style.top=(r.top+8)+'px';
+    document.body.appendChild(el);
+    setTimeout(function(){el.remove();},1250);
+  }
+  function confetti(){
+    var colors=['#8a5a38','#c9a872','#efe3cf','#a9762f','#d9c7ab'];
+    for(var i=0;i<34;i++){
+      var p=document.createElement('i');
+      p.className='confetti-piece';
+      p.style.left=(Math.random()*100)+'vw';
+      p.style.background=colors[i%colors.length];
+      p.style.setProperty('--dur',(1.1+Math.random()*0.9)+'s');
+      p.style.setProperty('--spin',(Math.random()*720-360)+'deg');
+      p.style.animationDelay=(Math.random()*0.25)+'s';
+      document.body.appendChild(p);
+      (function(node){ setTimeout(function(){node.remove();},2500); })(p);
+    }
+  }
+  function escapeHtml(s){
+    return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
+  function rowById(id){
+    var rows=document.querySelectorAll('.rune-row');
+    for(var i=0;i<rows.length;i++){ if(rows[i].getAttribute('data-rune-id')===id)return rows[i]; }
+    return null;
+  }
+  function status(row,text){
+    var s=row.querySelector('.status-tag'); if(!s)return;
+    s.textContent=text;
+    if(text==='EQUIPPED')s.classList.add('on'); else s.classList.remove('on');
+    s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop');
+  }
+  function stats(row,before,after){
+    var el=row.querySelector('.rune-stats'); if(!el)return;
+    var newText=el.textContent;
+    el.innerHTML='<span class="stat-old">'+escapeHtml(before||'')+'</span><span class="stat-arrow">to</span><span class="stat-new">'+escapeHtml(after||newText)+'</span>';
+    row.classList.add('changing','stat-change');
+    setTimeout(function(){ el.textContent=newText; },1150);
+  }
+  function bind(){
+    var forms=document.querySelectorAll('form[data-rune-ajax]:not([data-bound])');
+    for(var i=0;i<forms.length;i++){
+      (function(f){
+        f.setAttribute('data-bound','1');
+        f.addEventListener('submit',async function(e){
+          e.preventDefault();
+          var btn=f.querySelector('button'); if(btn)btn.disabled=true;
+          audio();
+          var oldStats='';
+          var actionInput=f.querySelector('input[name="action"]');
+          if(actionInput&&(actionInput.value==='rune_upgrade'||actionInput.value==='rune_reroll')){
+            var rid=f.querySelector('input[name="runeId"]');
+            var oldRow=rid?rowById(rid.value):null;
+            var oldEl=oldRow?oldRow.querySelector('.rune-stats'):null;
+            if(oldEl)oldStats=oldEl.textContent;
+          }
+          try{
+            var res=await fetch(f.action,{method:'POST',body:new FormData(f),headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
+            var data=await res.json();
+            if(!data.ok){ toast(data.msg,false); if(btn)btn.disabled=false; return; }
+            money(data.balanceAfter-data.balanceBefore);
+            if(data.fx==='fuse')sound('fuse');
+            if(data.fx==='upgrade')confetti();
+            var box=document.getElementById('runes-content');
+            var consumed=data.consumedIds||[];
+            consumed.forEach(function(id){ var r=rowById(id); if(r)r.classList.add('row-out'); });
+            setTimeout(function(){
+              if(data.html&&box){
+                box.outerHTML=data.html;
+                var row=data.runeId?rowById(data.runeId):null;
+                if(row){
+                  if(data.fx==='equip'||data.fx==='unequip')status(row,data.status);
+                  if(data.fx==='upgrade'||data.fx==='reroll')stats(row,oldStats||data.before,data.after);
+                  if(data.fx==='buy'||data.fx==='fuse')row.classList.add('row-in');
+                }
+              }
+              bind();
+            },consumed.length?380:0);
+            toast(data.msg,true);
+          }catch(err){ toast('Request failed.',false); if(btn)btn.disabled=false; }
+        });
+      })(forms[i]);
+    }
+  }
+  bind();
+})();
+</script>
 </body>
 </html>`;
 }
