@@ -948,7 +948,7 @@ const BACCALAUREATE_MATH_BANK = [
 // ---------- مساعدات للألعاب الخارجية (/trivia) ومضاعفات المكافآت ----------
 
 // مجموع أسئلة التحدي الفردي — خليط من كل بنوك الأسئلة الصعبة
-function getTriviaPool(mathPct = 3) {
+function getTriviaPool(mathPct = 3, baccalaureatePct = 3) {
     const pool = [];
     const add = (q, correct, opts) => pool.push({
         q: String(q),
@@ -966,12 +966,18 @@ function getTriviaPool(mathPct = 3) {
     for (const m of MATRIX_BANK) add(`أكمل المصفوفة:\n\`\`\`\n${m.grid.join('\n')}\n\`\`\``, m.a, m.t);
     // Math questions are a configurable percentage of the pool. Raising this
     // makes them show up more often; lowering it keeps events survivable.
-    const pct = Math.max(0, Math.min(100, Number(mathPct) || 0));
-    const mathBank = [...MATH_BRUTAL_BANK, ...BACCALAUREATE_MATH_BANK];
-    const mathCount = Math.min(mathBank.length, Math.round(pool.length * pct / 100));
-    const mathSample = [...mathBank].sort(() => Math.random() - 0.5).slice(0, mathCount);
+    const mathP = Math.max(0, Math.min(100, Number(mathPct) || 0));
+    const bacP = Math.max(0, Math.min(100, Number(baccalaureatePct) || 0));
+    const mathCount = Math.min(MATH_BRUTAL_BANK.length, Math.round(pool.length * mathP / 100));
+    const bacCount = Math.min(BACCALAUREATE_MATH_BANK.length, Math.round(pool.length * bacP / 100));
+    const mathSample = [...MATH_BRUTAL_BANK].sort(() => Math.random() - 0.5).slice(0, mathCount);
+    const bacSample = [...BACCALAUREATE_MATH_BANK].sort(() => Math.random() - 0.5).slice(0, bacCount);
     for (const h of mathSample) {
-        const prefix = String(h.q).startsWith('🧮') || String(h.q).startsWith('📘') ? '' : '🧮 ';
+        const prefix = String(h.q).startsWith('🧮') ? '' : '🧮 ';
+        add(`${prefix}${h.q}`, h.a, h.opts);
+    }
+    for (const h of bacSample) {
+        const prefix = String(h.q).startsWith('📘') ? '' : '📘 ';
         add(`${prefix}${h.q}`, h.a, h.opts);
     }
     return pool;

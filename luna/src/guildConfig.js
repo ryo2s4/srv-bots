@@ -103,6 +103,7 @@ function defaultGuildConfig() {
             prizePoints: 100,
             giftChancePct: 30,
             mathChancePct: 3,
+            baccalaureateChancePct: 3,
             giveawayMinutes: 5,
             gifts: []
         },
@@ -403,6 +404,7 @@ function normalizeConfig(cfg) {
         if (typeof f.prizePoints !== 'number' || Number.isNaN(f.prizePoints)) { f.prizePoints = base.prizePoints; changed = true; }
         if (typeof f.giftChancePct !== 'number' || Number.isNaN(f.giftChancePct)) { f.giftChancePct = base.giftChancePct; changed = true; }
         if (typeof f.mathChancePct !== 'number' || Number.isNaN(f.mathChancePct)) { f.mathChancePct = base.mathChancePct; changed = true; }
+        if (typeof f.baccalaureateChancePct !== 'number' || Number.isNaN(f.baccalaureateChancePct)) { f.baccalaureateChancePct = base.baccalaureateChancePct == null ? 3 : base.baccalaureateChancePct; changed = true; }
         if (typeof f.giveawayMinutes !== 'number' || Number.isNaN(f.giveawayMinutes)) { f.giveawayMinutes = base.giveawayMinutes; changed = true; }
         const giftKeys = ['xp_potion', 'points_potion', 'levelup_potion', 'points', 'coupon', 'generous_xp', 'rune'];
         if (!Array.isArray(f.gifts)) { f.gifts = []; changed = true; }

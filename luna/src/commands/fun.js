@@ -16,6 +16,7 @@ function panel(guildId, tag) {
             `**الجائزة:** ${c.prizePoints || 100} Luna Points (دائمًا)\n` +
             `**احتمال الهدية الإضافية:** ${c.giftChancePct == null ? 30 : c.giftChancePct}%\n` +
             `**نسبة أسئلة الرياضيات:** ${c.mathChancePct == null ? 3 : c.mathChancePct}%\n` +
+            `**نسبة أسئلة البكلوريا:** ${c.baccalaureateChancePct == null ? 3 : c.baccalaureateChancePct}%\n` +
             `**مدة الجيف أواي:** ${c.giveawayMinutes || 5} دقائق\n` +
             `**الهدايا:** ${(c.gifts || []).length}`
         )
@@ -35,7 +36,8 @@ function panel(guildId, tag) {
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('funui:duration').setLabel('مدة الجيف').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('funui:math').setLabel('نسبة الرياضيات').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId('funui:math').setLabel('نسبة الرياضيات').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('funui:baccalaureate_pct').setLabel('نسبة البكلوريا').setStyle(ButtonStyle.Secondary)
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('funui:toggle').setLabel(c.enabled ? '⛔ إيقاف' : '✅ تفعيل').setStyle(c.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
