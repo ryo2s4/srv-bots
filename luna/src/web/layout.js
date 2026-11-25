@@ -1,239 +1,214 @@
-const { esc, fmtNum } = require('./youPage');
+const { clean, fmtNum } = require('./youPage');
+const { icon } = require('./icons');
 
 const NAV = [
-    { key: 'profile', icon: '🌙', label: 'الملف الشخصي' },
-    { key: 'runes', icon: '🔮', label: 'الرونات' },
-    { key: 'shop', icon: '🛍️', label: 'المتجر' },
-    { key: 'inventory', icon: '🎒', label: 'ممتلكاتي' }
+    { key: 'profile', icon: 'user', label: 'الملف الشخصي' },
+    { key: 'runes', icon: 'gem', label: 'الرونات' },
+    { key: 'shop', icon: 'bag', label: 'المتجر' },
+    { key: 'inventory', icon: 'box', label: 'ممتلكاتي' }
 ];
 
 function flashBox(flash) {
     if (!flash) return '';
     const ok = flash.ok !== false;
-    return `<div class="flash ${ok ? 'ok' : 'err'}"><span class="flash-ico">${ok ? '✨' : '⚠️'}</span><div>${esc(flash.msg).replace(/\n/g, '<br>')}</div></div>`;
+    return `<div class="flash ${ok ? 'ok' : 'err'}">${icon(ok ? 'check' : 'warn', 16)}<div>${clean(flash.msg).replace(/\n/g, '<br>')}</div></div>`;
+}
+
+function smallStat(ico, label, value, sub = '') {
+    return `<div class="stat"><span class="stat-ico">${icon(ico, 20)}</span><span class="stat-text"><span class="stat-label">${label}</span><span class="stat-value">${value}${sub ? ` <small>${sub}</small>` : ''}</span></span></div>`;
 }
 
 function profileContent(view, token) {
     const xpPct = Math.max(0, Math.min(100, (view.xp / view.nextXp) * 100));
-    const boost = (icon, label, value, cls) => `
-      <div class="boost-card ${cls}">
-        <div class="boost-ico">${icon}</div>
-        <div class="boost-info"><div class="boost-label">${label}</div><div class="boost-value">+${fmtNum(value)}%</div></div>
-      </div>`;
-    const quick = (key, icon, label) => `<a class="quick-card" href="/p/${token}?tab=${key}"><span>${icon}</span><b>${label}</b><i>←</i></a>`;
+    const quick = (key, ico, label) => `<a class="quick" href="/p/${token}?tab=${key}">${icon(ico, 18)}<span>${label}</span>${icon('arrow', 16)}</a>`;
+    const boost = (ico, label, value) => `<div class="boost"><span class="boost-ico">${icon(ico, 20)}</span><span class="boost-label">${label}</span><strong>+${fmtNum(value)}%</strong></div>`;
 
     return `
-      <section class="hero">
-        <div class="hero-glow"></div>
-        <div class="hero-user">
-          ${view.avatar ? `<img src="${esc(view.avatar)}" alt="avatar" class="hero-avatar">` : '<div class="hero-avatar placeholder">🌙</div>'}
-          <div>
-            <div class="hero-eyebrow">LUNA PROFILE</div>
-            <h1>${esc(view.username)}</h1>
-            <div class="hero-sub">${esc(view.handle)} · 🌙 ${esc(view.guildName)}</div>
-          </div>
+      <section class="identity panel">
+        ${view.avatar ? `<img class="avatar" src="${clean(view.avatar)}" alt="">` : `<span class="avatar fallback">${icon('user', 30)}</span>`}
+        <div class="identity-main">
+          <span class="eyebrow">LUNA / PROFILE</span>
+          <h1>${clean(view.username)}</h1>
+          <p>${clean(view.handle)} <span class="sep">·</span> ${clean(view.guildName)}</p>
         </div>
-        <div class="hero-badge"><span>المستوى</span><strong>${fmtNum(view.level)}</strong></div>
+        <div class="level"><span>LEVEL</span><strong>${fmtNum(view.level)}</strong></div>
       </section>
 
-      <div class="stat-grid">
-        <div class="stat-card accent"><div class="stat-ico">💰</div><div><div class="stat-label">نقاط لونا</div><div class="stat-value">${fmtNum(view.luna)}</div></div></div>
-        <div class="stat-card"><div class="stat-ico">🎖️</div><div><div class="stat-label">الخبرة</div><div class="stat-value">${fmtNum(view.xp)} <small>/ ${fmtNum(view.nextXp)}</small></div></div></div>
+      <div class="stats">
+        ${smallStat('coin', 'نقاط لونا', fmtNum(view.luna))}
+        ${smallStat('medal', 'الخبرة', fmtNum(view.xp), `/ ${fmtNum(view.nextXp)}`)}
       </div>
 
-      <section class="section">
-        <div class="section-head"><h2>تقدم المستوى</h2><span class="section-note">${xpPct.toFixed(1)}% إلى المستوى التالي</span></div>
-        <div class="progress"><div class="progress-fill" style="width:${xpPct.toFixed(2)}%"></div></div>
+      <section class="panel">
+        <div class="panel-head"><h2>تقدم المستوى</h2><span>${xpPct.toFixed(1)}%</span></div>
+        <div class="progress"><div class="fill" style="width:${xpPct.toFixed(2)}%"></div></div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><h2>إجمالي البوستات</h2><span class="section-note">رتب + رونات + بوستات المتجر</span></div>
-        <div class="boost-grid">
-          ${boost('⚡', 'XP Boost', view.boosts.xp, 'xp')}
-          ${boost('💰', 'Luna Boost', view.boosts.luna, 'luna')}
-          ${boost('🏅', 'Level-Up Boost', view.boosts.levelup, 'level')}
+      <section class="panel">
+        <div class="panel-head"><h2>إجمالي البوستات</h2><span>رتب + رونات + بوستات المتجر</span></div>
+        <div class="boosts">
+          ${boost('bolt', 'XP', view.boosts.xp)}
+          ${boost('coin', 'Luna', view.boosts.luna)}
+          ${boost('trophy', 'Level-Up', view.boosts.levelup)}
         </div>
       </section>
 
-      <section class="section">
-        <div class="section-head"><h2>إدارة حسابك</h2></div>
+      <section class="panel">
+        <div class="panel-head"><h2>إدارة الحساب</h2></div>
         <div class="quick-grid">
-          ${quick('runes', '🔮', 'الرونات')}
-          ${quick('shop', '🛍️', 'المتجر')}
-          ${quick('inventory', '🎒', 'ممتلكاتي')}
+          ${quick('runes', 'gem', 'الرونات')}
+          ${quick('shop', 'bag', 'المتجر')}
+          ${quick('inventory', 'box', 'ممتلكاتي')}
         </div>
       </section>`;
 }
 
 function page({ token, view, tab, flash, content }) {
     const active = tab || 'profile';
-    const nav = NAV.map((n) => `<a class="nav-item ${active === n.key ? 'active' : ''}" href="/p/${token}?tab=${n.key}"><span class="nav-ico">${n.icon}</span><span>${n.label}</span></a>`).join('');
-    const title = NAV.find((n) => n.key === active)?.label || 'Luna Profile';
+    const nav = NAV.map((n) => `<a class="nav-item ${active === n.key ? 'active' : ''}" href="/p/${token}?tab=${n.key}">${icon(n.icon, 18)}<span>${n.label}</span></a>`).join('');
+    const title = NAV.find((n) => n.key === active)?.label || 'Luna';
 
     return `<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
-  <meta name="theme-color" content="#0b1020">
-  <title>${esc(title)} — Luna</title>
-  <style>
-    :root{
-      --bg:#080c18; --panel:#121a2d; --panel2:#182139; --text:#f2f5ff; --muted:#9aa8c7;
-      --a1:#b99cff; --a2:#6fd7ff; --gold:#ffd89b; --danger:#ff8a8a;
-      --line:rgba(255,255,255,.09); --shadow:0 18px 50px rgba(0,0,0,.45);
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;min-height:100%}
-    body{
-      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;
-      color:var(--text); background:
-        radial-gradient(900px 500px at 80% -10%,rgba(185,156,255,.18),transparent 60%),
-        radial-gradient(700px 500px at 0% 100%,rgba(111,215,255,.10),transparent 60%),
-        var(--bg);
-      display:flex; align-items:stretch; min-height:100vh;
-    }
-    a{color:inherit}
-    .sidebar{
-      width:248px; flex:0 0 248px; position:sticky; top:0; height:100vh;
-      padding:26px 18px; background:rgba(18,26,45,.75); backdrop-filter:blur(18px);
-      border-inline-start:1px solid var(--line); display:flex; flex-direction:column; gap:8px;
-    }
-    .brand{display:flex;align-items:center;gap:12px;padding:6px 10px 22px}
-    .brand-mark{
-      width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:20px;
-      background:linear-gradient(135deg,var(--a1),var(--a2)); box-shadow:0 8px 24px rgba(185,156,255,.35);
-    }
-    .brand-name{font-weight:900;letter-spacing:.5px;font-size:18px}
-    .brand-sub{font-size:11px;color:var(--muted);margin-top:2px}
-    .nav-item{
-      display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;
-      text-decoration:none;color:var(--muted);font-size:14px;font-weight:600;transition:.18s ease;
-      border:1px solid transparent;
-    }
-    .nav-item:hover{background:rgba(255,255,255,.05);color:var(--text)}
-    .nav-item.active{
-      color:#fff;background:linear-gradient(135deg,rgba(185,156,255,.22),rgba(111,215,255,.12));
-      border-color:rgba(185,156,255,.35);box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
-    }
-    .nav-ico{font-size:18px;width:24px;text-align:center}
-    .side-foot{margin-top:auto;padding:14px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.7}
-    .main{flex:1;min-width:0;padding:28px clamp(18px,4vw,48px) 60px}
-    .topbar{
-      display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
-      padding:14px 18px;border-radius:20px;background:rgba(18,26,45,.7);
-      border:1px solid var(--line);backdrop-filter:blur(16px);margin-bottom:24px;
-    }
-    .top-user{display:flex;align-items:center;gap:12px;min-width:0}
-    .top-avatar{width:46px;height:46px;border-radius:14px;object-fit:cover;background:#222;border:1px solid var(--line)}
-    .top-name{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .top-sub{font-size:12px;color:var(--muted);margin-top:3px}
-    .chips{display:flex;gap:10px;flex-wrap:wrap}
-    .chip{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--muted)}
-    .chip b{color:var(--gold);font-size:15px;margin-inline-start:6px}
-    .flash{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;margin-bottom:20px;font-size:13px;line-height:1.7}
-    .flash.ok{background:rgba(111,215,255,.10);border:1px solid rgba(111,215,255,.32);color:#bfeaff}
-    .flash.err{background:rgba(255,138,138,.10);border:1px solid rgba(255,138,138,.32);color:#ffc2c2}
-    .flash-ico{font-size:16px}
-    .hero{
-      position:relative;overflow:hidden;border-radius:26px;padding:28px;margin-bottom:20px;
-      background:linear-gradient(135deg,rgba(185,156,255,.16),rgba(24,33,57,.95) 55%);
-      border:1px solid rgba(185,156,255,.25);box-shadow:var(--shadow);
-      display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;
-    }
-    .hero-glow{position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(111,215,255,.12);filter:blur(60px);inset-inline-end:-60px;top:-100px;pointer-events:none}
-    .hero-user{display:flex;align-items:center;gap:18px;position:relative;min-width:0}
-    .hero-avatar{width:84px;height:84px;border-radius:24px;object-fit:cover;border:2px solid rgba(255,255,255,.2);box-shadow:0 10px 30px rgba(0,0,0,.4)}
-    .hero-avatar.placeholder{display:grid;place-items:center;background:#1b2340;font-size:34px}
-    .hero-eyebrow{font-size:11px;letter-spacing:2.5px;color:var(--a2);font-weight:800}
-    .hero h1{margin:6px 0 4px;font-size:clamp(22px,3vw,32px);line-height:1.2}
-    .hero-sub{color:var(--muted);font-size:13px}
-    .hero-badge{position:relative;text-align:center;background:rgba(8,12,24,.45);border:1px solid var(--line);border-radius:20px;padding:14px 22px;min-width:110px}
-    .hero-badge span{display:block;font-size:11px;color:var(--muted)}
-    .hero-badge strong{display:block;font-size:34px;line-height:1.1;margin-top:4px;color:var(--gold)}
-    .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:20px}
-    .stat-card{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
-    .stat-card.accent{border-color:rgba(255,216,155,.28);background:linear-gradient(135deg,rgba(255,216,155,.10),var(--panel))}
-    .stat-ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.06);font-size:20px}
-    .stat-label{font-size:12px;color:var(--muted)}
-    .stat-value{font-size:24px;font-weight:800;margin-top:3px}
-    .stat-value small{font-size:13px;color:var(--muted);font-weight:500}
-    .section{background:rgba(18,26,45,.72);border:1px solid var(--line);border-radius:22px;padding:20px;margin-bottom:18px}
-    .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-    .section-head h2{margin:0;font-size:16px;font-weight:800}
-    .section-note{font-size:12px;color:var(--muted)}
-    .progress{height:12px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
-    .progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--a1),var(--a2));box-shadow:0 0 18px rgba(185,156,255,.5)}
-    .boost-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-    .boost-card{display:flex;align-items:center;gap:12px;padding:16px;border-radius:18px;background:var(--panel2);border:1px solid var(--line)}
-    .boost-card.xp{border-color:rgba(185,156,255,.3)}
-    .boost-card.luna{border-color:rgba(255,216,155,.3)}
-    .boost-card.level{border-color:rgba(111,215,255,.3)}
-    .boost-ico{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:rgba(255,255,255,.06);font-size:20px}
-    .boost-label{font-size:12px;color:var(--muted)}
-    .boost-value{font-size:22px;font-weight:900;margin-top:2px}
-    .quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-    .quick-card{display:flex;align-items:center;gap:10px;text-decoration:none;padding:16px;border-radius:16px;background:var(--panel2);border:1px solid var(--line);transition:.18s}
-    .quick-card:hover{transform:translateY(-2px);border-color:rgba(185,156,255,.4)}
-    .quick-card span{font-size:20px}
-    .quick-card b{font-size:14px;flex:1}
-    .quick-card i{color:var(--a2);font-style:normal}
-    /* You pages */
-    .panel{background:var(--panel2);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px}
-    .panel h3{margin:0 0 14px;font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px}
-    .panel h3 small{font-weight:500;color:var(--muted);font-size:12px}
-    .card-row{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}
-    .card-row:first-of-type{border-top:0;padding-top:0}
-    .row-main{flex:1 1 260px;min-width:0}
-    .row-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .rune-title{font-weight:800;font-size:14px}
-    .muted{color:var(--muted);font-size:12px;line-height:1.6}
-    .price{margin-top:6px;font-size:13px;color:var(--gold)}
-    .pill{display:inline-block;background:rgba(111,215,255,.15);color:var(--a2);border-radius:999px;padding:3px 9px;font-size:11px;margin-inline-start:6px}
-    .pill.gold{background:rgba(255,216,155,.15);color:var(--gold)}
-    .inline{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .stack{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-    .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-    .list{margin:0;padding-inline-start:18px;line-height:1.9;font-size:13px;color:var(--muted)}
-    .list b{color:var(--text)}
-    input,select{background:#0d1425;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:9px 11px;font:inherit;font-size:13px;outline:none}
-    input:focus,select:focus{border-color:rgba(185,156,255,.6)}
-    .btn{cursor:pointer;border:1px solid transparent;border-radius:11px;padding:9px 14px;background:linear-gradient(135deg,var(--a1),#a98cff);color:#160f2b;font-weight:800;font-size:12px;transition:.15s;white-space:nowrap}
-    .btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
-    .btn.ghost{background:rgba(255,255,255,.05);color:var(--text);border-color:var(--line)}
-    .btn.danger{background:rgba(255,138,138,.16);color:#ffb0b0;border-color:rgba(255,138,138,.35)}
-    .foot{text-align:center;color:var(--muted);font-size:11px;margin-top:26px}
-    @media(max-width:900px){
-      body{display:block}
-      .sidebar{position:static;width:100%;height:auto;flex:none;flex-direction:row;align-items:center;overflow-x:auto;padding:14px;border-inline-start:0;border-bottom:1px solid var(--line)}
-      .brand{padding:0 14px 0 0}
-      .brand-sub,.side-foot{display:none}
-      .nav-item{white-space:nowrap}
-      .main{padding:20px 16px 40px}
-      .boost-grid,.quick-grid,.stat-grid,.grid2{grid-template-columns:1fr}
-      .hero{padding:20px}
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0c0f14">
+<title>${clean(title)} — Luna</title>
+<style>
+:root{
+  --bg:#0c0f14; --panel:#12161d; --panel2:#171c25; --line:#252c38;
+  --text:#e8edf5; --muted:#8993a4; --accent:#8ab4ff; --accent-dim:#24344d;
+  --gold:#d9b977; --danger:#e08a8a; --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{
+  background:var(--bg);color:var(--text);display:flex;min-height:100vh;
+  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;
+  font-size:14px;line-height:1.6;
+}
+a{color:inherit;text-decoration:none}
+.ico{display:inline-block;vertical-align:middle;flex:none}
+.sidebar{
+  width:216px;flex:0 0 216px;background:#0f1319;border-inline-start:1px solid var(--line);
+  padding:24px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:0 10px 22px}
+.brand-mark{width:34px;height:34px;border:1px solid var(--accent-dim);border-radius:8px;display:grid;place-items:center;color:var(--accent)}
+.brand-name{font-weight:800;letter-spacing:3px;font-size:14px}
+.brand-sub{font-size:10px;color:var(--muted);letter-spacing:1px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--muted);font-weight:600;transition:background .15s,color .15s}
+.nav-item:hover{background:#161b23;color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent)}
+.side-foot{margin-top:auto;padding:12px 10px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.8}
+.main{flex:1;min-width:0;padding:26px clamp(16px,3.5vw,42px) 56px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.top-user{display:flex;align-items:center;gap:12px;min-width:0}
+.top-avatar{width:38px;height:38px;border-radius:8px;object-fit:cover;background:var(--panel2);border:1px solid var(--line)}
+.top-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-sub{font-size:11px;color:var(--muted)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:6px 10px;font-size:12px;color:var(--muted)}
+.chip b{color:var(--text);font-variant-numeric:tabular-nums}
+.chip.gold b{color:var(--gold)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.panel-head h2{margin:0;font-size:14px;font-weight:700;letter-spacing:.2px}
+.panel-head h2::before{content:"";display:inline-block;width:3px;height:13px;background:var(--accent);margin-inline-end:9px;vertical-align:-2px;border-radius:2px}
+.panel-head span{font-size:11px;color:var(--muted)}
+.identity{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.avatar{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--line);background:var(--panel2)}
+.avatar.fallback{display:grid;place-items:center;color:var(--muted)}
+.identity-main{min-width:0;flex:1}
+.eyebrow{font-size:10px;letter-spacing:2px;color:var(--accent)}
+.identity h1{margin:2px 0;font-size:22px;line-height:1.3}
+.identity p{margin:0;color:var(--muted);font-size:12px}
+.sep{color:#4a5464;margin:0 4px}
+.level{text-align:center;border-inline-start:1px solid var(--line);padding-inline-start:18px;min-width:76px}
+.level span{display:block;font-size:10px;letter-spacing:1.5px;color:var(--muted)}
+.level strong{display:block;font-size:26px;color:var(--gold);font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.stat{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.stat-ico{width:36px;height:36px;display:grid;place-items:center;border-radius:8px;background:var(--panel2);color:var(--accent)}
+.stat-text{display:flex;flex-direction:column}
+.stat-label{font-size:11px;color:var(--muted)}
+.stat-value{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat-value small{font-size:12px;color:var(--muted);font-weight:400}
+.progress{height:8px;background:#1d232d;border-radius:999px;overflow:hidden}
+.fill{height:100%;background:var(--accent);border-radius:999px}
+.boosts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.boost{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px}
+.boost-ico{grid-row:1/3;color:var(--accent)}
+.boost-label{font-size:11px;color:var(--muted)}
+.boost strong{font-size:18px;font-variant-numeric:tabular-nums}
+.quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.quick{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px;color:var(--text);transition:border-color .15s}
+.quick:hover{border-color:var(--accent-dim)}
+.quick span{flex:1}
+.quick .ico:last-child{color:var(--muted)}
+/* You pages */
+.panel h3{margin:0 0 12px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.panel h3 .ico{color:var(--accent)}
+.panel h3 small{font-weight:400;color:var(--muted);font-size:11px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:11px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0;padding-top:0}
+.row-main{flex:1 1 240px;min-width:0}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.row-title{font-weight:700;font-size:13px}
+.muted{color:var(--muted);font-size:11px;line-height:1.7}
+.price{font-size:12px;color:var(--gold);font-variant-numeric:tabular-nums;margin-top:5px}
+.price s{color:var(--muted);margin-inline-end:6px}
+.tag{display:inline-block;border:1px solid var(--accent-dim);color:var(--accent);border-radius:5px;padding:1px 7px;font-size:10px;margin-inline-start:6px}
+.tag.gold{border-color:#4a3c26;color:var(--gold)}
+.inline{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.list{margin:0;padding-inline-start:18px;color:var(--muted);font-size:12px;line-height:1.9}
+.list b{color:var(--text)}
+input,select{background:#0d1117;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font:inherit;font-size:12px;outline:none}
+input:focus,select:focus{border-color:var(--accent-dim)}
+.btn{display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:1px solid var(--accent-dim);background:#182338;color:var(--text);border-radius:7px;padding:7px 10px;font:inherit;font-size:11px;font-weight:700;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:#0c0f14;border-color:var(--accent)}
+.btn.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+.btn.danger{background:transparent;border-color:#4a2c2c;color:var(--danger)}
+.flash{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);padding:11px 14px;margin-bottom:16px;font-size:12px}
+.flash.ok{color:var(--accent);border-color:var(--accent-dim)}
+.flash.err{color:var(--danger);border-color:#4a2c2c}
+.foot{text-align:center;color:var(--muted);font-size:10px;margin-top:28px;letter-spacing:.3px}
+@media(max-width:860px){
+  body{display:block}
+  .sidebar{position:static;width:100%;height:auto;flex-direction:row;align-items:center;overflow-x:auto;padding:12px;border-inline-start:0;border-bottom:1px solid var(--line)}
+  .brand{padding:0 14px 0 0}.brand-sub,.side-foot{display:none}
+  .nav-item{white-space:nowrap}
+  .main{padding:20px 14px 40px}
+  .boosts,.quick-grid,.stats,.grid2{grid-template-columns:1fr}
+}
+</style>
 </head>
 <body>
-  <aside class="sidebar">
-    <div class="brand"><div class="brand-mark">🌙</div><div><div class="brand-name">LUNA</div><div class="brand-sub">لوحة التحكم</div></div></div>
-    ${nav}
-    <div class="side-foot">رابط خاص بك<br>لا تشاركه مع أحد 💜</div>
-  </aside>
-  <main class="main">
-    <div class="topbar">
-      <div class="top-user">
-        ${view.avatar ? `<img class="top-avatar" src="${esc(view.avatar)}" alt="avatar">` : '<div class="top-avatar">🌙</div>'}
-        <div><div class="top-name">${esc(view.username)}</div><div class="top-sub">${esc(view.handle || view.guildName)}</div></div>
-      </div>
-      <div class="chips"><div class="chip">💰 <b>${fmtNum(view.luna)}</b> لونا</div><div class="chip">🎖️ <b>${fmtNum(view.level)}</b> مستوى</div></div>
+<aside class="sidebar">
+  <div class="brand"><span class="brand-mark">${icon('moon', 20)}</span><span><span class="brand-name">LUNA</span><span class="brand-sub">CONTROL PANEL</span></span></div>
+  ${nav}
+  <div class="side-foot">رابط خاص بك. لا تشاركه مع أحد.</div>
+</aside>
+<main class="main">
+  <div class="topbar">
+    <div class="top-user">
+      ${view.avatar ? `<img class="top-avatar" src="${clean(view.avatar)}" alt="">` : `<span class="top-avatar">${icon('user', 20)}</span>`}
+      <div><div class="top-name">${clean(view.username)}</div><div class="top-sub">${clean(view.handle || view.guildName)}</div></div>
     </div>
-    ${flashBox(flash)}
-    ${content}
-    <div class="foot">Luna Profile • كل التغييرات تتزامن مع Discord مباشرة ✨</div>
-  </main>
+    <div class="chips">
+      <span class="chip gold">${icon('coin', 14)}<b>${fmtNum(view.luna)}</b> Luna</span>
+      <span class="chip">${icon('medal', 14)}<b>${fmtNum(view.level)}</b> Level</span>
+    </div>
+  </div>
+  ${flashBox(flash)}
+  ${content}
+  <div class="foot">Luna Profile — changes sync with Discord instantly</div>
+</main>
 </body>
 </html>`;
 }
