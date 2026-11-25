@@ -338,7 +338,7 @@ input:focus,select:focus{border-color:var(--accent-dim)}
             var body=new URLSearchParams();
             var fd=new FormData(f);
             fd.forEach(function(value,key){ body.append(key,value); });
-            var res=await fetch(f.action,{method:'POST',body:body,headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
+            var res=await fetch(f.getAttribute('action'),{method:'POST',body:body,headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
             if(!res.ok){ toast('Request failed: HTTP '+res.status,false); if(btn)btn.disabled=false; return; }
             var text=await res.text();
             var data;
