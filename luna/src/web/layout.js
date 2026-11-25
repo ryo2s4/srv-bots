@@ -207,8 +207,8 @@ input:focus,select:focus{border-color:var(--accent-dim)}
 .rune-row.row-out{animation:rowOut .4s ease both}
 .money-fly{position:fixed;z-index:60;pointer-events:none;font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--gold);animation:moneyFloat 1.15s ease-out forwards;text-shadow:0 1px 0 #fff8ec}
 .money-fly.neg{color:var(--danger)}
-.fx-toast{position:fixed;inset-inline-end:20px;bottom:20px;z-index:70;max-width:min(420px,calc(100vw - 40px));border:1px solid var(--accent-dim);background:var(--panel);color:var(--text);border-radius:var(--radius);padding:13px 16px;font-size:15px;box-shadow:0 8px 24px rgba(59,47,36,.14);animation:toastIn .28s ease both}
-.fx-toast.err{border-color:#d3a9a1;color:var(--danger)}
+.fx-notice{border:1px solid var(--accent-dim);background:var(--panel2);color:var(--text);border-radius:var(--radius);padding:11px 15px;margin:0 0 14px;font-size:15px;animation:noticeIn .3s ease both}
+.fx-notice.err{border-color:#d3a9a1;color:var(--danger)}
 .confetti-piece{position:fixed;top:-12px;width:7px;height:11px;z-index:80;pointer-events:none;animation:confettiFall var(--dur) linear forwards;border-radius:1px}
 @keyframes tagPop{0%{transform:scale(.7);opacity:.3}60%{transform:scale(1.14)}100%{transform:scale(1);opacity:1}}
 @keyframes rowPulse{0%{background:transparent}30%{background:#efe0c8}100%{background:transparent}}
@@ -216,7 +216,7 @@ input:focus,select:focus{border-color:var(--accent-dim)}
 @keyframes rowIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 @keyframes rowOut{to{opacity:0;transform:translateX(12px)}}
 @keyframes moneyFloat{0%{opacity:0;transform:translateY(6px)}20%{opacity:1}100%{opacity:0;transform:translateY(-34px)}}
-@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes noticeIn{from{opacity:0}to{opacity:1}}
 @keyframes confettiFall{to{transform:translateY(105vh) rotate(var(--spin));opacity:.9}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -264,10 +264,13 @@ input:focus,select:focus{border-color:var(--accent-dim)}
     if(kind==='fuse'){ tone(330,0,0.16,'triangle'); tone(440,0.12,0.18,'triangle'); tone(660,0.26,0.28,'sine'); }
   }
   function toast(msg,ok){
+    var old=document.querySelector('.fx-notice'); if(old)old.remove();
     var t=document.createElement('div');
-    t.className='fx-toast'+(ok?'':' err'); t.textContent=msg;
-    document.body.appendChild(t);
-    setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(function(){t.remove();},320); },2600);
+    t.className='fx-notice'+(ok?'':' err'); t.textContent=msg;
+    var box=document.getElementById('runes-content');
+    if(box&&box.parentNode){ box.parentNode.insertBefore(t,box); }
+    else { document.querySelector('.main').insertBefore(t,document.querySelector('.main').firstChild); }
+    setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(function(){t.remove();},320); },3200);
   }
   function money(delta){
     if(!delta)return;
