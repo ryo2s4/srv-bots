@@ -27,8 +27,9 @@ module.exports = {
             description: [
                 'اختار إجراء من الأزرار بالأسفل 👇',
                 '',
-                '> ➕ **إضافة رتبة**: Role ID + السعر + الندرة',
-                '> ➕ **إضافة لقب**: نص اللقب + السعر + الندرة',
+                '> ➕ **إضافة رتبة**: Role ID + السعر + الندرة + وصف (اختياري)',
+                '> ➕ **إضافة لقب**: نص اللقب + السعر + الندرة + وصف (اختياري)',
+                '> 📝 **تعديل وصف**: اختيار عنصر وتغيير وصفه',
                 '> 🗑️ **حذف عنصر**: اختيار من قائمة',
                 '> 🏆 **تفعيل/إيقاف المزاد**',
                 '> 🎖️ **تعيين رتبة المزاد الأسطوري**'
@@ -39,6 +40,7 @@ module.exports = {
         const row1 = UI.row(
             UI.btn('shopadminui:add_role', 'إضافة رتبة 🎨', { style: ButtonStyle.Primary }),
             UI.btn('shopadminui:add_title', 'إضافة لقب 🎭', { style: ButtonStyle.Primary }),
+            UI.btn('shopadminui:edit_desc', 'تعديل وصف 📝', { style: ButtonStyle.Secondary }),
             UI.btn('shopadminui:remove_item', 'حذف عنصر 🗑️', { style: ButtonStyle.Danger })
         );
 

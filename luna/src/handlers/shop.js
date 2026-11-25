@@ -314,11 +314,13 @@ async function handleShopAdminButtons({ interaction }) {
         const price = new TextInputBuilder().setCustomId('price').setLabel('السعر (Luna Points)').setStyle(TextInputStyle.Short).setRequired(true);
         const rarity = new TextInputBuilder().setCustomId('rarity').setLabel('الندرة (اختياري)').setPlaceholder('common/uncommon/rare/legendary/mythic').setStyle(TextInputStyle.Short).setRequired(false);
         const rotation = new TextInputBuilder().setCustomId('rotation').setLabel('يومي أم أسبوعي؟ daily/weekly/both (اختياري)').setStyle(TextInputStyle.Short).setRequired(false);
+        const description = new TextInputBuilder().setCustomId('description').setLabel('وصف العنصر (اختياري)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(200).setPlaceholder('اكتب وصفًا قصيرًا يظهر للاعبين في المتجر');
         modal.addComponents(
             new ActionRowBuilder().addComponents(roleId),
             new ActionRowBuilder().addComponents(price),
             new ActionRowBuilder().addComponents(rarity),
-            new ActionRowBuilder().addComponents(rotation)
+            new ActionRowBuilder().addComponents(rotation),
+            new ActionRowBuilder().addComponents(description)
         );
         try { await interaction.showModal(modal); } catch { }
         return true;
@@ -330,11 +332,13 @@ async function handleShopAdminButtons({ interaction }) {
         const price = new TextInputBuilder().setCustomId('price').setLabel('السعر (Luna Points)').setStyle(TextInputStyle.Short).setRequired(true);
         const rarity = new TextInputBuilder().setCustomId('rarity').setLabel('الندرة (اختياري)').setPlaceholder('common/uncommon/rare/legendary/mythic').setStyle(TextInputStyle.Short).setRequired(false);
         const rotation = new TextInputBuilder().setCustomId('rotation').setLabel('يومي أم أسبوعي؟ daily/weekly/both (اختياري)').setStyle(TextInputStyle.Short).setRequired(false);
+        const description = new TextInputBuilder().setCustomId('description').setLabel('وصف العنصر (اختياري)').setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(200).setPlaceholder('اكتب وصفًا قصيرًا يظهر للاعبين في المتجر');
         modal.addComponents(
             new ActionRowBuilder().addComponents(title),
             new ActionRowBuilder().addComponents(price),
             new ActionRowBuilder().addComponents(rarity),
-            new ActionRowBuilder().addComponents(rotation)
+            new ActionRowBuilder().addComponents(rotation),
+            new ActionRowBuilder().addComponents(description)
         );
         try { await interaction.showModal(modal); } catch { }
         return true;
@@ -351,6 +355,34 @@ async function handleShopAdminButtons({ interaction }) {
             new ActionRowBuilder().addComponents(maxUses)
         );
         try { await interaction.showModal(modal); } catch { }
+        return true;
+    }
+
+    if (action === 'edit_desc') {
+        const shop = getGuildShop(interaction.guild.id);
+        const roles = Array.isArray(shop.roleItems) ? shop.roleItems : [];
+        const titles = Array.isArray(shop.titleItems) ? shop.titleItems : [];
+        const combined = [...roles, ...titles].filter(Boolean);
+        if (combined.length === 0) {
+            try { await interaction.reply({ content: '❌ ما فيه عناصر لتعديل وصفها حاليًا.', ephemeral: true }); } catch { }
+            return true;
+        }
+
+        const options = combined.slice(0, 25).map((it) => ({
+            label: (it.name || it.title || it.id || 'item').slice(0, 100),
+            description: `${it.description ? String(it.description).slice(0, 60) : 'بدون وصف'} — ${UI.fmtNum(it.price)}`.slice(0, 100),
+            value: it.id
+        })).filter((o) => o.value);
+
+        if (options.length === 0) {
+            try { await interaction.reply({ content: '❌ ما قدرت أجهّز قائمة العناصر… تأكد من البيانات 3:', ephemeral: true }); } catch { }
+            return true;
+        }
+
+        const row = new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder().setCustomId('shopadminuiSelect:edit_desc').setPlaceholder('اختار عنصر لتعديل وصفه').addOptions(options)
+        );
+        try { await interaction.reply({ content: '📝 تعديل وصف عنصر\nاختار العنصر من القائمة 👇', components: [row], ephemeral: true }); } catch { }
         return true;
     }
 
@@ -527,6 +559,48 @@ async function handleShopAdminSelectRemove({ interaction }) {
     return true;
 }
 
+async function handleShopAdminSelectEditDesc({ interaction }) {
+    if (!(interaction.isStringSelectMenu && interaction.isStringSelectMenu())) return false;
+    if (interaction.customId !== 'shopadminuiSelect:edit_desc') return false;
+
+    if (!interaction.guild) return true;
+    if (!interaction.memberPermissions || !interaction.memberPermissions.has(PermissionsBitField.Flags.ManageGuild)) {
+        try { await interaction.reply({ content: '❌ آسف بس تحتاج صلاحية Manage Server عشان تستخدم هالامر 3:', ephemeral: true }); } catch { }
+        return true;
+    }
+
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    const id = interaction.values && interaction.values[0] ? interaction.values[0] : null;
+    if (!id) return true;
+
+    const shop = getGuildShop(interaction.guild.id);
+    const item = [
+        ...(Array.isArray(shop.roleItems) ? shop.roleItems : []),
+        ...(Array.isArray(shop.titleItems) ? shop.titleItems : [])
+    ].find((x) => x && x.id === id);
+
+    if (!item) {
+        try { await interaction.reply({ content: '❌ ما لقيت هالعنصر… يمكن انحذف 3:', ephemeral: true }); } catch { }
+        return true;
+    }
+
+    const modal = new ModalBuilder()
+        .setCustomId(`shopadminuiModal:edit_desc:${encodeURIComponent(id)}`)
+        .setTitle('تعديل وصف العنصر 📝');
+
+    const desc = new TextInputBuilder()
+        .setCustomId('description')
+        .setLabel('الوصف (اتركه فاضي لحذف الوصف)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setMaxLength(200);
+    if (item.description) desc.setValue(String(item.description).slice(0, 200));
+
+    modal.addComponents(new ActionRowBuilder().addComponents(desc));
+    try { await interaction.showModal(modal); } catch { }
+    return true;
+}
+
 async function handleShopAdminModal({ interaction }) {
     if (!(interaction.isModalSubmit && interaction.isModalSubmit())) return false;
     if (!(typeof interaction.customId === 'string' && interaction.customId.startsWith('shopadminuiModal:'))) return false;
@@ -538,6 +612,47 @@ async function handleShopAdminModal({ interaction }) {
     }
 
     const action = interaction.customId.split(':')[1];
+
+    if (action === 'edit_desc') {
+        const itemId = decodeURIComponent(interaction.customId.split(':').slice(2).join(':') || '');
+        if (!itemId) {
+            try { await interaction.reply({ content: '❌ تعذر تحديد العنصر 3:', ephemeral: true }); } catch { }
+            return true;
+        }
+
+        const raw = interaction.fields.getTextInputValue('description');
+        const description = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+
+        let found = false;
+        updateGuildShop(interaction.guild.id, (g) => {
+            const next = { ...g };
+            const apply = (arr) => (Array.isArray(arr) ? arr : []).map((x) => {
+                if (x && x.id === itemId) {
+                    found = true;
+                    return { ...x, description: description || null };
+                }
+                return x;
+            });
+            next.roleItems = apply(next.roleItems);
+            next.titleItems = apply(next.titleItems);
+            return next;
+        });
+
+        if (!found) {
+            try { await interaction.reply({ content: '❌ ما لقيت هالعنصر… يمكن انحذف 3:', ephemeral: true }); } catch { }
+            return true;
+        }
+
+        try {
+            await interaction.reply({
+                content: description
+                    ? `✅ 📝 تم تحديث وصف العنصر: **${description}**`
+                    : '✅ 🗑️ تم حذف وصف العنصر.',
+                ephemeral: true
+            });
+        } catch { }
+        return true;
+    }
 
     if (action === 'announce_ch') {
         const raw = String(interaction.fields.getTextInputValue('channelId') || '').trim();
@@ -565,6 +680,8 @@ async function handleShopAdminModal({ interaction }) {
         const priceRaw = interaction.fields.getTextInputValue('price');
         const rarityRaw = interaction.fields.getTextInputValue('rarity');
         const rotationRaw = interaction.fields.getTextInputValue('rotation');
+        const descriptionRaw = interaction.fields.getTextInputValue('description');
+        const description = String(descriptionRaw || '').replace(/\s+/g, ' ').trim().slice(0, 200);
 
         const roleId = extractId(roleIdRaw);
         const price = Math.floor(Number(String(priceRaw || '').trim()) || 0);
@@ -589,8 +706,12 @@ async function handleShopAdminModal({ interaction }) {
             const next = { ...g };
             const list = Array.isArray(next.roleItems) ? [...next.roleItems] : [];
             const id = `role:${role.id}`;
-            const entry = { id, name: role.name, roleId: role.id, price, rarity, rotation };
             const idx = list.findIndex((x) => x && x.id === id);
+            const previous = idx >= 0 ? list[idx] : null;
+            const entry = {
+                id, name: role.name, roleId: role.id, price, rarity, rotation,
+                description: description || (previous && previous.description) || null
+            };
             if (idx >= 0) list[idx] = entry;
             else list.push(entry);
             next.roleItems = list;
@@ -599,7 +720,7 @@ async function handleShopAdminModal({ interaction }) {
 
         try {
             await interaction.reply({
-                content: `✅ تمام! ضفت رتبة للمتجر: <@&${role.id}> بسعر **${UI.fmtNum(price)}** Luna Points ✨ (ندرة: **${fmtRarity(rarity)}**)`,
+                content: `✅ تمام! ضفت رتبة للمتجر: <@&${role.id}> بسعر **${UI.fmtNum(price)}** Luna Points ✨ (ندرة: **${fmtRarity(rarity)}**)${description ? `\n> 📝 **الوصف:** ${description}` : ''}`,
                 ephemeral: true
             });
         } catch { }
@@ -611,6 +732,8 @@ async function handleShopAdminModal({ interaction }) {
         const priceRaw = interaction.fields.getTextInputValue('price');
         const rarityRaw = interaction.fields.getTextInputValue('rarity');
         const rotationRaw = interaction.fields.getTextInputValue('rotation');
+        const descriptionRaw = interaction.fields.getTextInputValue('description');
+        const description = String(descriptionRaw || '').replace(/\s+/g, ' ').trim().slice(0, 200);
 
         const title = String(titleRaw || '').replace(/\s+/g, ' ').trim().slice(0, 64);
         const price = Math.floor(Number(String(priceRaw || '').trim()) || 0);
@@ -626,8 +749,12 @@ async function handleShopAdminModal({ interaction }) {
             const next = { ...g };
             const list = Array.isArray(next.titleItems) ? [...next.titleItems] : [];
             const id = `title:${title.toLowerCase()}`;
-            const entry = { id, name: title, title, price, rarity, rotation };
             const idx = list.findIndex((x) => x && x.id === id);
+            const previous = idx >= 0 ? list[idx] : null;
+            const entry = {
+                id, name: title, title, price, rarity, rotation,
+                description: description || (previous && previous.description) || null
+            };
             if (idx >= 0) list[idx] = entry;
             else list.push(entry);
             next.titleItems = list;
@@ -636,7 +763,7 @@ async function handleShopAdminModal({ interaction }) {
 
         try {
             await interaction.reply({
-                content: `✅ تمت إضافة لقب للمتجر: **${title}** بسعر **${UI.fmtNum(price)}** Luna Points ✨ (ندرة: **${fmtRarity(rarity)}**)`,
+                content: `✅ تمت إضافة لقب للمتجر: **${title}** بسعر **${UI.fmtNum(price)}** Luna Points ✨ (ندرة: **${fmtRarity(rarity)}**)${description ? `\n> 📝 **الوصف:** ${description}` : ''}`,
                 ephemeral: true
             });
         } catch { }
@@ -801,6 +928,7 @@ async function handleShopButtons({ interaction }) {
             description: [
                 `**${featured.name || featured.title}**`,
                 '',
+                ...(featured.description ? [`> 📝 **الوصف:** ${featured.description}`] : []),
                 `> 🏷️ **النوع:** ${shopKindAr(featured.kind)}`,
                 `> 🎲 **الندرة:** ${fmtRarity(featured.rarity)}`,
                 `> 💰 **السعر:** ~~${UI.fmtNum(featured.price)}~~ → **${UI.fmtNum(finalCost)}** Luna Points ✨`,
@@ -874,6 +1002,7 @@ async function handleShopButtons({ interaction }) {
             description: [
                 `**${limited.name || limited.title}**`,
                 '',
+                ...(limited.description ? [`> 📝 **الوصف:** ${limited.description}`] : []),
                 `> 🎲 **الندرة:** ${fmtRarity(limited.rarity)}`,
                 `> 💰 **السعر:** ~~${UI.fmtNum(limited.price)}~~ → **${UI.fmtNum(finalCost)}** Luna Points ✨`,
                 `> ⏳ **ينتهي:** <t:${Math.floor(nextDailyResetTs() / 1000)}:R>`,
@@ -1039,7 +1168,7 @@ async function handleShopButtons({ interaction }) {
 
     const options = items.slice(0, 25).map((it) => ({
         label: (it.name || it.title || 'عنصر').slice(0, 100),
-        description: `النوع: ${shopKindAr(it.kind)} | السعر: ${UI.fmtNum(it.price)} | ${fmtRarity(it.rarity)}`.slice(0, 100),
+        description: `${it.description ? `${it.description} — ` : ''}${UI.fmtNum(it.price)} ✨ · ${fmtRarity(it.rarity)}`.slice(0, 100),
         value: it.id
     }));
 
@@ -1138,6 +1267,7 @@ async function handleShopSelect({ interaction }) {
     const desc = [
         `**${item.name || item.title}**`,
         '',
+        (item.description ? `> 📝 **الوصف:** ${item.description}` : ''),
         `> 🏷️ **النوع:** ${shopKindAr(item.kind)}`,
         `> 🎲 **الندرة:** ${fmtRarity(item.rarity)}`,
         `> 💰 **السعر:** ~~${UI.fmtNum(item.price)}~~ → **${UI.fmtNum(finalCost)}** Luna Points ✨`,
@@ -1557,6 +1687,7 @@ async function handleShopHistoryButton({ interaction }) {
 async function handle({ client, interaction }) {
     if (await handleShopAdminButtons({ interaction })) return true;
     if (await handleShopAdminSelectRemove({ interaction })) return true;
+    if (await handleShopAdminSelectEditDesc({ interaction })) return true;
     if (await handleShopAdminModal({ interaction })) return true;
 
     if (await handleShopButtons({ interaction })) return true;

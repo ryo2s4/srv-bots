@@ -323,7 +323,7 @@ function buildRestockEmbed(shop) {
     const limited = s.limited && s.limited.item ? resolve(s.limited.item) : null;
     const discount = s.dailyDiscount && Number(s.dailyDiscount.percent) > 0 ? Math.floor(Number(s.dailyDiscount.percent)) : 0;
 
-    const itemLine = (x) => `**${x.name || x.title}** — ${fmtRarity(x.rarity)} · \`${UI.fmtNum(x.price)}\` 🌙`;
+    const itemLine = (x) => `**${x.name || x.title}** — ${fmtRarity(x.rarity)} · \`${UI.fmtNum(x.price)}\` 🌙${x.description ? `\n> 📝 ${String(x.description).slice(0, 120)}` : ''}`;
 
     const fields = [];
     if (featured) fields.push({ name: '⭐ عرض اليوم المميز', value: itemLine(featured), inline: false });
