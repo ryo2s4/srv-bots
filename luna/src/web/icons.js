@@ -33,6 +33,7 @@ const paths = {
 
 function icon(name, size = 18) {
     const d = paths[name] || paths.info;
+    size = Math.round((Number(size) || 18) * 1.2);
     return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 }
 
