@@ -885,6 +885,28 @@ const MATH_BRUTAL_BANK = [
     { q: 'Find lim(x→∞) of x·(sqrt(x²+1) - x). It looks like ∞·0.', a: '1/2', opts: ['1/2', '1', '0', '∞'] }
 ];
 
+// ---------- أسئلة دورات بكلوريا سوريا (علمي) ----------
+const BACCALAUREATE_MATH_BANK = [
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان f(x)=x³-3x، فإن f\'(2) يساوي:', a: '9', opts: ['9', '6', '12', '3'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nقيمة النهاية lim(x→0) (sin 5x / x) تساوي:', a: '5', opts: ['5', '1', '0', '1/5'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان z = 1 + i، فإن |z| يساوي:', a: '√2', opts: ['√2', '2', '1', '0'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nالتكامل ∫ 2x dx يساوي:', a: 'x² + C', opts: ['x² + C', '2x² + C', 'x + C', 'x²'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان f(x)=ln(x)، فإن f\'(x) يساوي:', a: '1/x', opts: ['1/x', 'ln(x)', 'x', 'e^x'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nقيمة النهاية lim(x→+∞) ((2x+1)/(x-3)) تساوي:', a: '2', opts: ['2', '1', '+∞', '-2/3'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان f(x)=e^(2x)، فإن f\'(x) يساوي:', a: '2e^(2x)', opts: ['2e^(2x)', 'e^(2x)', '2e^x', 'e^(2x)+2'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nحل المعادلة 2^x = 8 هو:', a: '3', opts: ['3', '4', '2', '8'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان cos(θ)=1/2 حيث θ زاوية حادة، فإن θ تساوي:', a: '60°', opts: ['60°', '30°', '45°', '90°'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nالتكامل ∫ cos(x) dx يساوي:', a: 'sin(x) + C', opts: ['sin(x) + C', '-sin(x) + C', 'cos(x) + C', '-cos(x) + C'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان f(x)=x²+1، فإن قيمة f(3) تساوي:', a: '10', opts: ['10', '7', '9', '6'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nقيمة النهاية lim(x→0) ((1-cos x)/x²) تساوي:', a: '1/2', opts: ['1/2', '1', '0', '2'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nمشتق التابع f(x)=sin(x) هو:', a: 'cos(x)', opts: ['cos(x)', '-cos(x)', 'sin(x)', '-sin(x)'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان log₂(8)=x، فإن x يساوي:', a: '3', opts: ['3', '2', '4', '8'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nفي متتالية حسابية حدها الأول 3 وأساسها 2، الحد الخامس يساوي:', a: '11', opts: ['11', '9', '13', '10'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان f(x)=√x، فإن f\'(4) يساوي:', a: '1/4', opts: ['1/4', '1/2', '2', '4'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nالتكامل ∫ من 0 إلى 1 لـ 3x² dx يساوي:', a: '1', opts: ['1', '3', '0', '1/3'] },
+    { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا أُلقي نردان متمايزان، فإن عدد عناصر فضاء العينة يساوي:', a: '36', opts: ['36', '12', '6', '18'] }
+];
+
 // ---------- مساعدات للألعاب الخارجية (/trivia) ومضاعفات المكافآت ----------
 
 // مجموع أسئلة التحدي الفردي — خليط من كل بنوك الأسئلة الصعبة
@@ -907,9 +929,13 @@ function getTriviaPool(mathPct = 3) {
     // Math questions are a configurable percentage of the pool. Raising this
     // makes them show up more often; lowering it keeps events survivable.
     const pct = Math.max(0, Math.min(100, Number(mathPct) || 0));
-    const mathCount = Math.min(MATH_BRUTAL_BANK.length, Math.round(pool.length * pct / 100));
-    const mathSample = [...MATH_BRUTAL_BANK].sort(() => Math.random() - 0.5).slice(0, mathCount);
-    for (const h of mathSample) add(`🧮 ${h.q}`, h.a, h.opts);
+    const mathBank = [...MATH_BRUTAL_BANK, ...BACCALAUREATE_MATH_BANK];
+    const mathCount = Math.min(mathBank.length, Math.round(pool.length * pct / 100));
+    const mathSample = [...mathBank].sort(() => Math.random() - 0.5).slice(0, mathCount);
+    for (const h of mathSample) {
+        const prefix = String(h.q).startsWith('🧮') || String(h.q).startsWith('📘') ? '' : '🧮 ';
+        add(`${prefix}${h.q}`, h.a, h.opts);
+    }
     return pool;
 }
 
@@ -984,6 +1010,7 @@ module.exports = {
     minDurationMsFor,
     getTriviaPool,
     MATH_BRUTAL_BANK,
+    BACCALAUREATE_MATH_BANK,
     rewardMultiplierFor,
     REWARD_MULTIPLIERS,
     xoWinner,
