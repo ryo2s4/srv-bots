@@ -1292,16 +1292,16 @@ async function handleShopButtons({ interaction }) {
 
         if (!items.length) {
             if (section === 'utility') {
-                return respond({ content: '❌ ما فيه أدوار خدمية حالياً. الأدمن يقدر يضيفها من `/shopadminui` 🔧' });
+                return respond({ content: '❌ ما فيه رتب صلاحيات حالياً. الأدمن يقدر يضيفها من `/shopadminui` 🔧' });
             }
             if (section === 'daily' || section === 'weekly') {
                 const embed = UI.embed({
                     color: UI.COLORS.shop,
                     title: '🛍️ متجر لونا — Luna Points ✨',
-                    description: 'ما فيه عناصر في هذا التدوير حاليًا… بس تقدر تشوف الأدوار الخدمية المتاحة دائمًا 👇',
+                    description: 'ما فيه عناصر في هذا التدوير حاليًا… بس تقدر تشوف رتب الصلاحيات المتاحة دائمًا 👇',
                     footerText: `طلبته: ${interaction.user.tag}`
                 });
-                return respond({ embeds: [embed], components: [UI.row(UI.btn('shop:utility', '🔧 الأدوار الخدمية', { style: ButtonStyle.Secondary }))] });
+                return respond({ embeds: [embed], components: [UI.row(UI.btn('shop:utility', '🔧 رتب الصلاحيات', { style: ButtonStyle.Secondary }))] });
             }
             return respond({ content: '❌ ما فيه عناصر في هذا القسم حاليًا… خلّوا الأدمن يضيف عناصر عبر `/shopadminui` 🌙' });
         }
@@ -1331,10 +1331,10 @@ async function handleShopButtons({ interaction }) {
     const isUtility = section === 'utility';
     const embed = UI.embed({
         color: UI.COLORS.shop,
-        title: isUtility ? '🔧 الأدوار الخدمية' : '🛍️ متجر لونا — Luna Points ✨',
+        title: isUtility ? '🔧 رتب الصلاحيات' : '🛍️ متجر لونا — Luna Points ✨',
         description: isUtility
             ? [
-                'أدوار خدمية متاحة دائمًا — ما تحتاج تنتظر تدوير اليوم أو الأسبوع 🔧',
+                'رتب صلاحيات متاحة دائمًا — ما تحتاج تنتظر تدوير اليوم أو الأسبوع 🔧',
                 '',
                 '**العناصر المتاحة:**',
                 itemLines,
@@ -1368,7 +1368,7 @@ async function handleShopButtons({ interaction }) {
     const components = [row];
     if (section === 'daily' || section === 'weekly') {
         components.push(UI.row(
-            UI.btn('shop:utility', '🔧 الأدوار الخدمية', { style: ButtonStyle.Secondary })
+            UI.btn('shop:utility', '🔧 رتب الصلاحيات', { style: ButtonStyle.Secondary })
         ));
     }
 

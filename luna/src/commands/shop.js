@@ -53,7 +53,7 @@ module.exports = {
         const row = UI.row(
             UI.btn('shop:daily', 'عروض يومية 🗓️', { style: ButtonStyle.Primary }),
             UI.btn('shop:weekly', 'عروض أسبوعية 📅', { style: ButtonStyle.Primary }),
-            UI.btn('shop:utility', 'الأدوار الخدمية 🔧', { style: ButtonStyle.Secondary }),
+            UI.btn('shop:utility', 'رتب الصلاحيات 🔧', { style: ButtonStyle.Secondary }),
             UI.btn('shop:more', 'بوستات/خدمات ⚡🤝', { style: ButtonStyle.Secondary })
         );
 
