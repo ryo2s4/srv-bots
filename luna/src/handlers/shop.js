@@ -122,6 +122,13 @@ function decodeItemRef(guildId, ref) {
     try { return decodeURIComponent(raw); } catch { return raw || null; }
 }
 
+function isUtilityRoleItem(item) {
+    if (!item || item.kind !== 'role') return false;
+    if (item.utility === true) return true;
+    const name = String(item.name || item.title || '').toLowerCase();
+    return /(صوتي|صور|فيديو|روابط|ايموجي خارج|اسم مستعار|نيك|voice|pic|vid|link|external emoji|gif|msg|nickname|rename)/i.test(name);
+}
+
 // هل العنصر متاح للبيع اليوم؟
 // - العناصر الثابتة دائمًا متاحة، ما عدا المحدودة (kind: 'limited') لأنها تنباع فقط عبر سطح "العنصر المحدود" اليومي
 // - الكتالوج (roleItems/titleItems) دائمًا متاح (كتالوج دائم)
@@ -1255,6 +1262,12 @@ async function handleShopButtons({ interaction }) {
 
     let items = refs.map((r) => staticItems.find((x) => x.id === r.id) || resolveCatalogItem(shop, r)).filter(Boolean);
     if (section === 'more') items = staticItems.filter((x) => x && !['mystery', 'limited'].includes(x.kind));
+    if (section === 'utility') {
+        const roleItems = Array.isArray(shop.roleItems) ? shop.roleItems : [];
+        items = roleItems
+            .map((x) => resolveCatalogItem(shop, { id: x.id }))
+            .filter((x) => x && isUtilityRoleItem(x));
+    }
 
     if (!items.length) {
         if (section === 'weekly' || section === 'daily') {
@@ -1278,6 +1291,18 @@ async function handleShopButtons({ interaction }) {
         }
 
         if (!items.length) {
+            if (section === 'utility') {
+                return respond({ content: '❌ ما فيه أدوار خدمية حالياً. الأدمن يقدر يضيفها من `/shopadminui` 🔧' });
+            }
+            if (section === 'daily' || section === 'weekly') {
+                const embed = UI.embed({
+                    color: UI.COLORS.shop,
+                    title: '🛍️ متجر لونا — Luna Points ✨',
+                    description: 'ما فيه عناصر في هذا التدوير حاليًا… بس تقدر تشوف الأدوار الخدمية المتاحة دائمًا 👇',
+                    footerText: `طلبته: ${interaction.user.tag}`
+                });
+                return respond({ embeds: [embed], components: [UI.row(UI.btn('shop:utility', '🔧 الأدوار الخدمية', { style: ButtonStyle.Secondary }))] });
+            }
             return respond({ content: '❌ ما فيه عناصر في هذا القسم حاليًا… خلّوا الأدمن يضيف عناصر عبر `/shopadminui` 🌙' });
         }
     }
@@ -1303,26 +1328,36 @@ async function handleShopButtons({ interaction }) {
         return `- ${it.emoji || '🛍️'} **${it.name || it.title || 'عنصر'}** — ${fmtRarity(it.rarity)} — 💰 ${priceTxt} ✨`;
     }).join('\n');
 
+    const isUtility = section === 'utility';
     const embed = UI.embed({
         color: UI.COLORS.shop,
-        title: '🛍️ متجر لونا — Luna Points ✨',
-        description: [
-            'اختار العنصر من القائمة بالأسفل 👇',
-            '',
-            '**العناصر المتاحة:**',
-            itemLines,
-            '',
-            `> ⏳ **اليومي يتجدد:** <t:${nextDailyTs}:R>`,
-            `> ⏳ **الأسبوعي يتجدد:** <t:${nextWeeklyTs}:R>`,
-            '',
-            '⭐ **Featured** — عنصر مميز يتغير يوميًا',
-            '🎁 **Mystery Box** — صندوق مفاجأة بمكافآت عشوائية',
-            '⚡ **بوستات** — مزايا مؤقتة مثل زيادة الخبرة',
-            '🤝 **خدمات** — خدمات مفيدة مثل نقل XP وVIP',
-            '🏆 **مزاد أسطوري** — مزايدة على رتبة أسطورية',
-            '',
-            '> 🛡️ المتجر محمي ضد الاستغلال (Cooldowns + منع الرصيد السالب)'
-        ].join('\n') + discountTxt,
+        title: isUtility ? '🔧 الأدوار الخدمية' : '🛍️ متجر لونا — Luna Points ✨',
+        description: isUtility
+            ? [
+                'أدوار خدمية متاحة دائمًا — ما تحتاج تنتظر تدوير اليوم أو الأسبوع 🔧',
+                '',
+                '**العناصر المتاحة:**',
+                itemLines,
+                '',
+                '> 🛡️ المتجر محمي ضد الاستغلال (Cooldowns + منع الرصيد السالب)'
+            ].join('\n') + discountTxt
+            : [
+                'اختار العنصر من القائمة بالأسفل 👇',
+                '',
+                '**العناصر المتاحة:**',
+                itemLines,
+                '',
+                `> ⏳ **اليومي يتجدد:** <t:${nextDailyTs}:R>`,
+                `> ⏳ **الأسبوعي يتجدد:** <t:${nextWeeklyTs}:R>`,
+                '',
+                '⭐ **Featured** — عنصر مميز يتغير يوميًا',
+                '🎁 **Mystery Box** — صندوق مفاجأة بمكافآت عشوائية',
+                '⚡ **بوستات** — مزايا مؤقتة مثل زيادة الخبرة',
+                '🤝 **خدمات** — خدمات مفيدة مثل نقل XP وVIP',
+                '🏆 **مزاد أسطوري** — مزايدة على رتبة أسطورية',
+                '',
+                '> 🛡️ المتجر محمي ضد الاستغلال (Cooldowns + منع الرصيد السالب)'
+            ].join('\n') + discountTxt,
         footerText: `طلبته: ${interaction.user.tag}`
     });
 
@@ -1330,7 +1365,14 @@ async function handleShopButtons({ interaction }) {
         new StringSelectMenuBuilder().setCustomId(`shopSelect:${section}`).setPlaceholder('اختار عنصر').addOptions(options)
     );
 
-    return respond({ embeds: [embed], components: [row] });
+    const components = [row];
+    if (section === 'daily' || section === 'weekly') {
+        components.push(UI.row(
+            UI.btn('shop:utility', '🔧 الأدوار الخدمية', { style: ButtonStyle.Secondary })
+        ));
+    }
+
+    return respond({ embeds: [embed], components });
 }
 
 async function handleShopSelect({ interaction }) {
