@@ -339,7 +339,10 @@ input:focus,select:focus{border-color:var(--accent-dim)}
             var fd=new FormData(f);
             fd.forEach(function(value,key){ body.append(key,value); });
             var res=await fetch(f.action,{method:'POST',body:body,headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
-            var data=await res.json();
+            if(!res.ok){ toast('Request failed: HTTP '+res.status,false); if(btn)btn.disabled=false; return; }
+            var text=await res.text();
+            var data;
+            try{ data=JSON.parse(text); }catch(pe){ toast('Request failed: bad response '+text.slice(0,90),false); if(btn)btn.disabled=false; return; }
             if(!data.ok){ toast(data.msg,false); if(btn)btn.disabled=false; return; }
             money(data.balanceAfter-data.balanceBefore);
             if(data.fx==='fuse')sound('fuse');
@@ -360,7 +363,12 @@ input:focus,select:focus{border-color:var(--accent-dim)}
               bind();
             },consumed.length?380:0);
             toast(data.msg,true);
-          }catch(err){ toast('Request failed.',false); if(btn)btn.disabled=false; }
+          }catch(err){
+            var detail=(err&&err.message)?err.message:String(err);
+            toast('Request failed: '+detail,false);
+            if(btn)btn.disabled=false;
+            setTimeout(function(){ try{ f.submit(); }catch(e){} },500);
+          }
         });
       })(forms[i]);
     }
