@@ -210,30 +210,64 @@ async function handle({ client, interaction }) {
             await interaction.reply({ content: `✅🌈 تم تفعيل رتبة RGB!\n- الرتبة: <@&${role.id}>\n- التغيير كل: **${intervalRaw}**`, flags: MessageFlags.Ephemeral });
             return true;
         }
-        if (id === 'adminuiModal:roleboost:add') {
+        if (id === 'adminuiModal:roleboost:pickrole') {
             const roleId = interaction.fields.getTextInputValue('roleid').trim().replace(/^<@&(\d+)>$/, '$1');
             if (!/^\d{15,20}$/.test(roleId)) {
                 await interaction.reply({ content: '❌ اكتب ID رتبة صحيح أو منشن الرتبة (مثل <@&123456789012345678>) 3:', flags: MessageFlags.Ephemeral });
                 return true;
             }
-            const type = interaction.fields.getTextInputValue('type').trim();
-            const percent = parseInt(interaction.fields.getTextInputValue('percent'), 10);
-            if (!boostTypes.some((b) => b.value === type)) {
-                await interaction.reply({ content: 'نوع البوست غير صحيح.', flags: MessageFlags.Ephemeral });
+
+            const row = new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder()
+                    .setCustomId(`adminuiSelect:roleboost:types:${roleId}`)
+                    .setPlaceholder('اختار البوستات اللي تبيها (تقدر تختار أكثر من واحد)')
+                    .setMinValues(1)
+                    .setMaxValues(boostTypes.length)
+                    .addOptions(boostTypes.map((b) => ({ label: b.name, value: b.value, description: b.value })))
+            );
+
+            await interaction.reply({
+                content: `⚡ الرتبة: <@&${roleId}>\nاختار نوع البوست (أو أكثر) من القائمة 👇`,
+                components: [row],
+                flags: MessageFlags.Ephemeral
+            });
+            return true;
+        }
+
+        if (id.startsWith('adminuiModal:roleboost:add:')) {
+            const partsAdd = id.split(':');
+            // adminuiModal:roleboost:add:<roleId>:<typesCsv>
+            const roleId = partsAdd[3];
+            const typesCsv = partsAdd[4] || '';
+            const types = typesCsv.split(',').map((s) => s.trim()).filter((t) => boostTypes.some((b) => b.value === t));
+            if (!roleId || !/^\d{15,20}$/.test(roleId) || types.length === 0) {
+                await interaction.reply({ content: '❌ بيانات البوست غير صالحة، جرب مرة ثانية.', flags: MessageFlags.Ephemeral });
                 return true;
             }
-            if (isNaN(percent) || percent < 1 || percent > 1000) {
-                await interaction.reply({ content: 'النسبة لازم تكون بين 1 و 1000.', flags: MessageFlags.Ephemeral });
-                return true;
-            }
-            const multiplier = 1 + percent / 100;
+
             const cfg = getGuildConfig(interaction.guild.id);
             const boosts = Array.isArray(cfg.roleBoosts) ? [...cfg.roleBoosts] : [];
-            const existing = boosts.findIndex((b) => b && b.roleId === roleId && b.type === type);
-            if (existing !== -1) boosts[existing] = { roleId, type, multiplier };
-            else boosts.push({ roleId, type, multiplier });
+            const results = [];
+            for (const type of types) {
+                const raw = interaction.fields.getTextInputValue(`pct_${type}`);
+                const percent = parseInt(String(raw || '').trim(), 10);
+                if (isNaN(percent) || percent < 1 || percent > 1000) {
+                    await interaction.reply({ content: `❌ نسبة **${type}** لازم تكون رقم بين 1 و 1000.`, flags: MessageFlags.Ephemeral });
+                    return true;
+                }
+                const multiplier = 1 + percent / 100;
+                const existing = boosts.findIndex((b) => b && b.roleId === roleId && b.type === type);
+                const entry = { roleId, type, multiplier };
+                if (existing !== -1) boosts[existing] = entry;
+                else boosts.push(entry);
+                results.push(`> **${boostTypes.find((b) => b.value === type)?.name || type}**: ${fmtPct(multiplier)}`);
+            }
+
             updateGuildConfig(interaction.guild.id, (c) => ({ ...c, roleBoosts: boosts }));
-            await interaction.reply({ content: `✅ <@&${roleId}> → ${boostTypes.find((b) => b.value === type)?.name || type} **${fmtPct(multiplier)}**`, flags: MessageFlags.Ephemeral });
+            await interaction.reply({
+                content: `✅ تم تحديث بوستات <@&${roleId}>:\n${results.join('\n')}`,
+                flags: MessageFlags.Ephemeral
+            });
             return true;
         }
         return false;
@@ -241,18 +275,56 @@ async function handle({ client, interaction }) {
 
     // ====== SELECT MENU ======
     if (interaction.isStringSelectMenu()) {
-        if (id !== 'adminuiSelect:roleboost:remove') return false;
-        const roleId = interaction.values[0];
-        const cfg = getGuildConfig(interaction.guild.id);
-        const boosts = Array.isArray(cfg.roleBoosts) ? cfg.roleBoosts : [];
-        const filtered = boosts.filter((b) => b && b.roleId !== roleId);
-        if (filtered.length === boosts.length) {
-            await interaction.reply({ content: 'مافي بوستات لهذي الرتبة 3:', flags: MessageFlags.Ephemeral });
+        if (id === 'adminuiSelect:roleboost:remove') {
+            const roleId = interaction.values[0];
+            const cfg = getGuildConfig(interaction.guild.id);
+            const boosts = Array.isArray(cfg.roleBoosts) ? cfg.roleBoosts : [];
+            const filtered = boosts.filter((b) => b && b.roleId !== roleId);
+            if (filtered.length === boosts.length) {
+                await interaction.reply({ content: 'مافي بوستات لهذي الرتبة 3:', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+            updateGuildConfig(interaction.guild.id, (c) => ({ ...c, roleBoosts: filtered }));
+            await interaction.reply({ content: `✅ تم حذف بوستات <@&${roleId}>`, flags: MessageFlags.Ephemeral });
             return true;
         }
-        updateGuildConfig(interaction.guild.id, (c) => ({ ...c, roleBoosts: filtered }));
-        await interaction.reply({ content: `✅ تم حذف بوستات <@&${roleId}>`, flags: MessageFlags.Ephemeral });
-        return true;
+
+        if (id.startsWith('adminuiSelect:roleboost:types:')) {
+            const roleId = id.slice('adminuiSelect:roleboost:types:'.length);
+            if (!/^\d{15,20}$/.test(roleId)) {
+                await interaction.reply({ content: '❌ بيانات الرتبة غير صالحة، جرب مرة ثانية.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const selected = Array.isArray(interaction.values)
+                ? interaction.values.filter((t) => boostTypes.some((b) => b.value === t))
+                : [];
+            if (selected.length === 0) {
+                await interaction.reply({ content: '❌ لازم تختار بوست واحد على الأقل.', flags: MessageFlags.Ephemeral });
+                return true;
+            }
+
+            const modal = new ModalBuilder()
+                .setCustomId(`adminuiModal:roleboost:add:${roleId}:${selected.join(',')}`)
+                .setTitle('نسب البوستات');
+
+            for (const type of selected.slice(0, 5)) {
+                const meta = boostTypes.find((b) => b.value === type);
+                const input = new TextInputBuilder()
+                    .setCustomId(`pct_${type}`)
+                    .setLabel(`${meta ? meta.name : type} (%)`)
+                    .setPlaceholder('مثال: 20 = +20% (1-1000)')
+                    .setStyle(TextInputStyle.Short)
+                    .setRequired(true)
+                    .setMaxLength(4);
+                modal.addComponents(new ActionRowBuilder().addComponents(input));
+            }
+
+            await interaction.showModal(modal);
+            return true;
+        }
+
+        return false;
     }
 
     // ====== BUTTONS ======
@@ -373,16 +445,14 @@ async function handle({ client, interaction }) {
     // ROLEBOOST ACTIONS
     if (section === 'roleboost') {
         if (action === 'add') {
-            const modal = new ModalBuilder().setCustomId('adminuiModal:roleboost:add').setTitle('➕ إضافة بوست لرتبة');
-            const roleInput = new TextInputBuilder().setCustomId('roleid').setLabel('ID الرتبة').setStyle(TextInputStyle.Short).setRequired(true);
-            const typeInput = new TextInputBuilder()
-                .setCustomId('type')
-                .setLabel('نوع البوست')
-                .setPlaceholder('xp_boost / luna_boost / levelup_reward_boost')
+            const modal = new ModalBuilder().setCustomId('adminuiModal:roleboost:pickrole').setTitle('➕ إضافة بوستات لرتبة');
+            const roleInput = new TextInputBuilder()
+                .setCustomId('roleid')
+                .setLabel('ID الرتبة (أو منشن)')
+                .setPlaceholder('مثال: 123456789012345678 أو <@&...>')
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true);
-            const pctInput = new TextInputBuilder().setCustomId('percent').setLabel('النسبة المئوية (20 = +20%)').setStyle(TextInputStyle.Short).setRequired(true);
-            modal.addComponents(new ActionRowBuilder().addComponents(roleInput), new ActionRowBuilder().addComponents(typeInput), new ActionRowBuilder().addComponents(pctInput));
+            modal.addComponents(new ActionRowBuilder().addComponents(roleInput));
             await interaction.showModal(modal);
             return true;
         }
