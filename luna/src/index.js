@@ -97,6 +97,7 @@ const eventGames = require('./eventGames');
 const { clampNumber, hslToRgbInt, rememberInteractionId, hasRecentInteractionId, cleanupRecentInteractionIds, extractId, lunaPointsRewardForLevel, pickOne, markOnce, normalizeShortcutTrigger, parseAllowTargets, canUseAutoReply } = require('./utils');
 const { runShortcutCommand, buildShortcutCommandRows } = require('./utils/shortcutRunner');
 const { getWeekKey, nextDailyResetTs, nextWeeklyResetTs, rarityWeight, shopKindAr, pickWeighted, boostMultiplier, stackMult, getActiveXpMultiplier, getActiveLunaMultiplier, getActiveLevelUpRewardMultiplier, getRoleBoostMultiplier } = require('./economy');
+const { startProfileWeb } = require('./web/profileWeb');
 
 // Thin wrapper: musicUI's version takes (guildId, client)
 async function refreshMusicPanelMessage(guildId) {
@@ -9660,6 +9661,8 @@ async function loginWithRetry() {
         }
     }
 }
+
+startProfileWeb(client);
 
 loginWithRetry();
 

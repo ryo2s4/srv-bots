@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const UI = require('../utils/ui');
 const { getUserStats } = require('../levelsStore');
 const { getUserInventory } = require('../shopStore');
@@ -6,6 +6,7 @@ const { xpForNextLevel } = require('../xpCurve');
 const { getBoostNameAr, formatRemainingAr, getTotalBoostSummary } = require('../boostMeta');
 const { getGuildConfig } = require('../guildConfig');
 const { TIERS, getRuneBoosts, fmtPct: runePct, fmtRuneLine, getTotalRuneSummary } = require('../runes');
+const { getProfileWebUrl } = require('../web/profileWeb');
 
 function tierEmoji(tier) {
     const t = TIERS[tier];
@@ -234,7 +235,15 @@ module.exports = {
             ]
         });
 
-        return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+        const profileUrl = getProfileWebUrl(interaction.guild.id, targetUser.id);
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('فتح صفحة البروفايل 🌐')
+                .setStyle(ButtonStyle.Link)
+                .setURL(profileUrl)
+        );
+
+        return interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
     }
 };
 

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -130,6 +131,15 @@ function getDb() {
             message_id TEXT,
             meta_json TEXT NOT NULL,
             PRIMARY KEY (guild_id, created_at)
+        );
+
+        CREATE TABLE IF NOT EXISTS profile_web_tokens (
+            guild_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (guild_id, user_id)
         );
     `);
 
@@ -464,6 +474,44 @@ function getUserEventWins(guildId, userId) {
     return { total, today, week, favorite, favoriteCount };
 }
 
+function getOrCreateProfileWebToken(guildId, userId) {
+    const db = getDb();
+    const gid = String(guildId);
+    const uid = String(userId);
+    const row = db.prepare('SELECT token FROM profile_web_tokens WHERE guild_id = ? AND user_id = ?').get(gid, uid);
+    if (row && row.token) return String(row.token);
+
+    const now = Date.now();
+    for (let i = 0; i < 5; i++) {
+        const token = crypto.randomBytes(24).toString('hex');
+        try {
+            db.prepare(`
+                INSERT INTO profile_web_tokens (guild_id, user_id, token, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+            `).run(gid, uid, token, now, now);
+            return token;
+        } catch (err) {
+            if (err && err.code === 'SQLITE_CONSTRAINT_UNIQUE') continue;
+            throw err;
+        }
+    }
+    throw new Error('Failed to generate profile web token');
+}
+
+function resolveProfileWebToken(token) {
+    const db = getDb();
+    const t = String(token || '').trim();
+    if (!t) return null;
+    const row = db.prepare('SELECT guild_id, user_id, created_at, updated_at FROM profile_web_tokens WHERE token = ?').get(t);
+    if (!row) return null;
+    return {
+        guildId: String(row.guild_id),
+        userId: String(row.user_id),
+        createdAt: Number(row.created_at) || 0,
+        updatedAt: Number(row.updated_at) || 0
+    };
+}
+
 module.exports = {
     getDb,
     getAiMemoryEntry,
@@ -480,5 +528,7 @@ module.exports = {
     listEventHistory,
     getEventStats,
     getUserEventWins,
+    getOrCreateProfileWebToken,
+    resolveProfileWebToken,
     paths: { dataDir, dbFile }
 };
