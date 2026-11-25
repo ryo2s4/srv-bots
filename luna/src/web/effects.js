@@ -26,6 +26,8 @@ function effectsScript() {
       tone(523,0.23,0.20,'triangle'); tone(784,0.38,0.36,'sine');
     } else if(kind==='upgrade'){
       tone(523,0,0.10,'sine'); tone(659,0.09,0.12,'sine'); tone(880,0.20,0.28,'sine');
+    } else if(kind==='coin'){
+      tone(784,0,0.07,'triangle'); tone(1046,0.07,0.12,'triangle');
     }
   }
   function rowById(id){
@@ -38,12 +40,12 @@ function effectsScript() {
     return { x:r.left+r.width/2, y:r.top+r.height/2, w:r.width, h:r.height, top:r.top };
   }
   function coinSvg(){
-    return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h4a2 2 0 0 1 0 4h-3a2 2 0 0 0 0 4h4"/></svg>';
+    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h4a2 2 0 0 1 0 4h-3a2 2 0 0 0 0 4h4"/></svg>';
   }
   function money(delta,fromEl,toEl){
     if(!delta)return;
-    var from=fromEl?(fromEl.width?fromEl:rectCenter(fromEl)):null;
-    var to=toEl?(toEl.width?toEl:rectCenter(toEl)):null;
+    var from=fromEl?((fromEl.width||fromEl.w)?fromEl:rectCenter(fromEl)):null;
+    var to=toEl?((toEl.width||toEl.w)?toEl:rectCenter(toEl)):null;
     var el=document.createElement('div');
     el.className='money-fx'+(delta<0?' neg':'');
     el.innerHTML=coinSvg()+'<span>'+(delta>0?'+':'')+delta+'</span>';
@@ -53,10 +55,10 @@ function effectsScript() {
     var dx=to?to.x-(from?from.x:window.innerWidth/2):(delta<0?70:-70);
     var dy=to?to.y-(from?from.top:window.innerHeight/2):-60;
     var a=el.animate([
-      {transform:'translate(0,0) scale(.7)',opacity:0},
-      {transform:'translate('+(dx*0.22)+'px,'+(dy*0.18-14)+'px) scale(1.08)',opacity:1,offset:0.22},
-      {transform:'translate('+dx+'px,'+dy+'px) scale(.85)',opacity:0}
-    ],{duration:1000,easing:'cubic-bezier(.2,.7,.2,1)'});
+      {transform:'translate(0,0) scale(.6)',opacity:0},
+      {transform:'translate('+(dx*0.22)+'px,'+(dy*0.18-18)+'px) scale(1.25)',opacity:1,offset:0.25},
+      {transform:'translate('+dx+'px,'+dy+'px) scale(.9)',opacity:0}
+    ],{duration:1250,easing:'cubic-bezier(.2,.7,.2,1)'});
     a.onfinish=function(){ el.remove(); };
   }
   function rowFlash(row,color){
@@ -169,10 +171,13 @@ function effectsScript() {
             if(!data.ok){ inlineError(btn,data.msg); if(btn)btn.disabled=false; return; }
             var box=document.getElementById('runes-content');
             var consumed=data.consumedIds||[];
+            if(data.fx==='sell'&&data.runeId&&consumed.indexOf(data.runeId)<0)consumed.push(data.runeId);
             consumed.forEach(function(id,idx){ var r=rowById(id); if(r)setTimeout(function(){ r.classList.add('row-out'); },idx*55); });
 
             if(data.fx==='fuse')sound('fuse');
             if(data.fx==='upgrade'){ sound('upgrade'); confetti(oldRow); }
+            if(data.fx==='buy'||data.fx==='sell')sound('coin');
+            if(data.fx==='sell')money(data.balanceAfter-data.balanceBefore,oldRect||chip,chip);
 
             var wait=consumed.length?420:0;
             setTimeout(function(){
@@ -189,10 +194,7 @@ function effectsScript() {
                 }
                 if(data.fx==='buy'||data.fx==='fuse'){
                   materialize(row);
-                  money(data.balanceAfter-data.balanceBefore,lunaChip,row);
-                }
-                if(data.fx==='sell'){
-                  money(data.balanceAfter-data.balanceBefore,oldRect||lunaChip,lunaChip);
+                  if(data.fx!=='fuse')money(data.balanceAfter-data.balanceBefore,lunaChip,row);
                 }
               }
               bind();
