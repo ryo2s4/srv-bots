@@ -6,7 +6,7 @@ const { getUserInventory, updateUserInventory } = require('./shopStore');
 const { getGuildShop, updateGuildShop } = require('./shopStore');
 const { processXpGain } = require('./levelUpService');
 const { generateRuneDrop } = require('./runes');
-const { getTriviaPool } = require('./eventGames');
+const { getTriviaPool, BACCALAUREATE_MATH_BANK } = require('./eventGames');
 
 const active = new Map(); // eventId -> state
 const roundLocks = new Set(); // guild ids with a round in progress
@@ -174,21 +174,35 @@ async function runEventNow(guildId, client, forcedType = null, roundIndex = 0, r
     const done = new Promise((r) => { resolveDone = r; });
     let state;
 
-    if (type === 'trivia') {
-        // Reuse the harder /events question banks (general knowledge, English,
-        // riddles) so competitive events are genuinely difficult.
-        const pool = getTriviaPool(c.mathChancePct);
-        const t = pool.length
-            ? pool[Math.floor(Math.random() * pool.length)]
-            : { q: 'كم عدد الكواكب في المجموعة الشمسية؟', correct: '8', opts: ['8', '9', '7', '10'] };
+    if (type === 'trivia' || type === 'baccalaureate') {
+        let t;
+        let titlePrefix = '🧠 **تحدٍ صعب**';
+        if (type === 'baccalaureate') {
+            const bank = Array.isArray(BACCALAUREATE_MATH_BANK) && BACCALAUREATE_MATH_BANK.length
+                ? BACCALAUREATE_MATH_BANK
+                : [];
+            const picked = bank.length ? bank[Math.floor(Math.random() * bank.length)] : null;
+            t = picked
+                ? { q: picked.q, correct: picked.a, opts: Array.isArray(picked.opts) ? picked.opts : [picked.a] }
+                : { q: '📘 اسئلة دورات بكلوريا سوريا — اختر الاجابة الصحيحة:\nإذا كان f(x)=x²، فإن f\'(3) يساوي:', correct: '6', opts: ['6', '9', '3', '12'] };
+            titlePrefix = '📘 **بكلوريا — اسئلة دورات**';
+        } else {
+            // Reuse the harder /events question banks (general knowledge, English,
+            // riddles) so competitive events are genuinely difficult.
+            const pool = getTriviaPool(c.mathChancePct);
+            t = pool.length
+                ? pool[Math.floor(Math.random() * pool.length)]
+                : { q: 'كم عدد الكواكب في المجموعة الشمسية؟', correct: '8', opts: ['8', '9', '7', '10'] };
+        }
         const options = Array.isArray(t.opts) && t.opts.length >= 2
             ? t.opts.slice(0, 4)
             : [t.correct, 'إجابة أخرى'];
+        const eventType = type === 'baccalaureate' ? 'baccalaureate' : 'trivia';
         state = {
-            id, guildId: String(guildId), type: 'trivia', channel,
+            id, guildId: String(guildId), type: eventType, channel,
             roundIndex, roundTotal, done, _resolveDone: resolveDone,
             messageId: null, prize: Number(c.prizePoints) || 100, gift,
-            description: `${t.q}\n\n🧠 **تحدٍ صعب** — أول إجابة صحيحة تفوز!`,
+            description: `${t.q}\n\n${titlePrefix} — أول إجابة صحيحة تفوز!`,
             correct: t.correct, entrants: new Set(), finished: false, endsAt: Date.now() + 90_000
         };
         const row = new ActionRowBuilder().addComponents(

@@ -39,7 +39,8 @@ function panel(guildId, tag) {
         ),
         new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('funui:toggle').setLabel(c.enabled ? '⛔ إيقاف' : '✅ تفعيل').setStyle(c.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('funui:run').setLabel('▶️ شغّل الآن').setStyle(ButtonStyle.Success)
+            new ButtonBuilder().setCustomId('funui:run').setLabel('▶️ شغّل الآن').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId('funui:baccalaureate').setLabel('📘 بكلوريا').setStyle(ButtonStyle.Primary)
         )
     ];
     return { embed, components: rows };

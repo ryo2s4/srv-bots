@@ -2076,6 +2076,11 @@ client.on('interactionCreate', async interaction => {
                 return replyEphemeral(interaction, { content: res.ok
                     ? `✅ بدأت ${res.started}/${res.count} فعالية بالتسلسل (جيف أواي أولًا)`
                     : `❌ ما صار أي حدث: ${res.error || 'تحقق من قنوات الأحداث والصلاحيات'}` });
+            } else if (action === 'baccalaureate') {
+                const res = await runEventNow(interaction.guild.id, client, 'baccalaureate').catch((e) => ({ ok: false, error: e.message }));
+                return replyEphemeral(interaction, { content: res.ok
+                    ? '✅ تم إطلاق سؤال بكلوريا الآن في قناة الأحداث.'
+                    : `❌ ما قدرت أطلق سؤال بكلوريا: ${res.error || 'تحقق من قناة الأحداث والصلاحيات'}` });
             } else {
                 const fields = {
                     channel: [['id', 'Channel ID أو <#...>', c.channelId || '']],
